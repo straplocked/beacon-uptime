@@ -96,15 +96,26 @@ export default async function PublicStatusPage({
         ORDER BY day ASC
       `);
 
-      // Overall uptime
+      // Overall uptime + response stats
       const overallStats = await db.execute(sql`
         SELECT
           COUNT(*) AS total,
-          COUNT(*) FILTER (WHERE status = 'up') AS up_count
+          COUNT(*) FILTER (WHERE status = 'up') AS up_count,
+          ROUND(AVG(response_time_ms)) AS avg_response,
+          MIN(response_time_ms) AS min_response,
+          MAX(response_time_ms) AS max_response
         FROM check_results
         WHERE monitor_id = ${monitor.id}
           AND time > NOW() - ${days + ' days'}::interval
       `);
+
+      // Recent checks for detail view
+      const recentChecks = await db
+        .select()
+        .from(checkResults)
+        .where(eq(checkResults.monitorId, monitor.id))
+        .orderBy(desc(checkResults.time))
+        .limit(20);
 
       const overall = overallStats[0] as any;
       const uptimePercent =
@@ -118,14 +129,27 @@ export default async function PublicStatusPage({
         id: monitor.id,
         name: spm.displayName || monitor.name,
         target: monitor.target,
+        type: monitor.type,
         group: spm.groupName,
         status: monitor.status,
+        intervalSeconds: monitor.intervalSeconds,
+        lastCheckedAt: monitor.lastCheckedAt?.toISOString() || null,
         uptimePercent,
+        avgResponse: overall?.avg_response ? Number(overall.avg_response) : null,
+        minResponse: overall?.min_response ? Number(overall.min_response) : null,
+        maxResponse: overall?.max_response ? Number(overall.max_response) : null,
         dailyStats: (dailyStats as any[]).map((d) => ({
           day: d.day,
           total: Number(d.total),
           upCount: Number(d.up_count),
           avgResponse: d.avg_response ? Number(d.avg_response) : null,
+        })),
+        recentChecks: recentChecks.map((c) => ({
+          time: c.time.toISOString(),
+          status: c.status,
+          responseTimeMs: c.responseTimeMs,
+          statusCode: c.statusCode,
+          region: c.region,
         })),
       };
     })
@@ -221,9 +245,16 @@ export default async function PublicStatusPage({
                   key={mon.id}
                   name={mon.name}
                   target={mon.target}
+                  type={mon.type}
                   status={mon.status}
                   uptimePercent={mon.uptimePercent}
+                  avgResponse={mon.avgResponse}
+                  minResponse={mon.minResponse}
+                  maxResponse={mon.maxResponse}
+                  intervalSeconds={mon.intervalSeconds}
+                  lastCheckedAt={mon.lastCheckedAt}
                   dailyStats={mon.dailyStats}
+                  recentChecks={mon.recentChecks}
                   showUptime={page.showUptimePercentage}
                   showResponseTime={page.showResponseTime}
                   days={page.showHistoryDays}
