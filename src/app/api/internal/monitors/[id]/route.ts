@@ -9,7 +9,6 @@ import { monitorCheckQueue } from "@/lib/queue";
 
 const updateMonitorSchema = z.object({
   name: z.string().min(1).max(100).optional(),
-  target: z.string().min(1).optional(),
   intervalSeconds: z.number().int().min(30).optional(),
   timeoutMs: z.number().int().min(1000).max(60000).optional(),
   expectedStatusCode: z.number().int().optional(),
@@ -102,7 +101,6 @@ export async function PATCH(
   const data = parsed.data;
 
   if (data.name !== undefined) updateData.name = data.name;
-  if (data.target !== undefined) updateData.target = data.target;
   if (data.intervalSeconds !== undefined) updateData.intervalSeconds = data.intervalSeconds;
   if (data.timeoutMs !== undefined) updateData.timeoutMs = data.timeoutMs;
   if (data.expectedStatusCode !== undefined) updateData.expectedStatusCode = data.expectedStatusCode;

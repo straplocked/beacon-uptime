@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Clock, Globe, Pause, Play, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { MonitorActions } from "@/components/monitors/monitor-actions";
+import { EditableName } from "@/components/monitors/editable-name";
 import { ResponseChart } from "@/components/monitors/response-chart";
 import { CheckHistory } from "@/components/monitors/check-history";
 
@@ -90,7 +91,7 @@ export default async function MonitorDetailPage({
               <span
                 className={`h-3 w-3 rounded-full ${statusColor[monitor.status] || "bg-slate-300"}`}
               />
-              <h1 className="text-2xl font-bold">{monitor.name}</h1>
+              <EditableName monitorId={monitor.id} initialName={monitor.name} />
               <Badge variant="outline">{monitor.type.toUpperCase()}</Badge>
             </div>
             <p className="text-muted-foreground mt-1">{monitor.target}</p>
