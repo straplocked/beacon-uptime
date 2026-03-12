@@ -9,7 +9,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
-  --font-display: var(--font-roboto-slab), "Roboto Slab", serif;
+  --font-display: var(--font-space-grotesk), "Space Grotesk", sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -136,6 +136,25 @@
 
 .animate-pulse-dot {
   animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* Status page theme-aware pulse indicators */
+.status-pulse-accent {
+  box-shadow: var(--sp-status-glow) var(--sp-accent);
+  animation: sp-pulse 2s ease-in-out infinite;
+}
+.status-pulse-warning {
+  box-shadow: var(--sp-status-glow) var(--sp-warning);
+  animation: sp-pulse 2s ease-in-out infinite;
+}
+.status-pulse-danger {
+  box-shadow: var(--sp-status-glow) var(--sp-danger);
+  animation: sp-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes sp-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.15); }
 }
 
 /* Lighting effects */

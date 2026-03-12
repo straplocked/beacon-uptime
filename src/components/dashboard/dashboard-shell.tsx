@@ -30,7 +30,7 @@ interface DashboardShellProps {
 }
 
 const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Monitors", href: "/monitors", icon: BarChart3 },
   { name: "Status Pages", href: "/status-pages", icon: Globe },
   { name: "Incidents", href: "/incidents", icon: AlertTriangle },
@@ -90,10 +90,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
           {/* Nav links */}
           <nav className="flex-1 px-3 py-4 space-y-1">
             {navigation.map((item) => {
-              const isActive =
-                item.href === "/"
-                  ? pathname === "/"
-                  : pathname.startsWith(item.href);
+              const isActive = pathname.startsWith(item.href);
 
               return (
                 <Link

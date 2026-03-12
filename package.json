@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:docker": "docker compose -f docker-compose.dev.yml up",
+    "dev:docker:build": "docker compose -f docker-compose.dev.yml up --build",
+    "dev:docker:down": "docker compose -f docker-compose.dev.yml down",
     "build": "next build && npm run build:worker",
     "build:worker": "tsx --tsconfig tsconfig.worker.json src/worker/index.ts > /dev/null 2>&1 || true",
     "start": "next start",

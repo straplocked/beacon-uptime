@@ -1,18 +1,30 @@
 services:
   app:
-    build: .
-    container_name: beacon-app
+    build:
+      context: .
+      target: deps
+    container_name: beacon-app-dev
     restart: unless-stopped
+    command: npx next dev
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
     ports:
       - "3100:3000"
     environment:
+      - NODE_ENV=development
       - DATABASE_URL=postgresql://beacon:beacon@db:5432/beacon
       - REDIS_URL=redis://redis:6379
-      - BREVO_API_KEY=${BREVO_API_KEY}
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
-      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
-      - BASE_URL=https://beacon.pluginsynthesis.com
-      - SESSION_SECRET=${SESSION_SECRET}
+      - BASE_URL=http://localhost:3100
+      - SESSION_SECRET=dev-secret-change-me-in-production-1234567890abcdef
+      - BREVO_API_KEY=${BREVO_API_KEY:-}
+      - FROM_EMAIL=alerts@pluginsynthesis.com
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      - STRIPE_PRO_PRICE_ID=${STRIPE_PRO_PRICE_ID:-}
+      - STRIPE_TEAM_PRICE_ID=${STRIPE_TEAM_PRICE_ID:-}
+      - PROBE_REGION=us-east
     depends_on:
       db:
         condition: service_healthy
@@ -20,14 +32,20 @@ services:
         condition: service_healthy
 
   worker:
-    build: .
-    container_name: beacon-worker
+    build:
+      context: .
+      target: deps
+    container_name: beacon-worker-dev
     restart: unless-stopped
-    command: ["node", "dist/worker/index.js"]
+    command: npx tsx --watch src/worker/index.ts
+    volumes:
+      - .:/app
+      - /app/node_modules
     environment:
       - DATABASE_URL=postgresql://beacon:beacon@db:5432/beacon
       - REDIS_URL=redis://redis:6379
-      - BREVO_API_KEY=${BREVO_API_KEY}
+      - BREVO_API_KEY=${BREVO_API_KEY:-}
+      - FROM_EMAIL=alerts@pluginsynthesis.com
     depends_on:
       db:
         condition: service_healthy
@@ -35,10 +53,15 @@ services:
         condition: service_healthy
 
   scheduler:
-    build: .
-    container_name: beacon-scheduler
+    build:
+      context: .
+      target: deps
+    container_name: beacon-scheduler-dev
     restart: unless-stopped
-    command: ["node", "dist/worker/scheduler.js"]
+    command: npx tsx --watch src/worker/scheduler.ts
+    volumes:
+      - .:/app
+      - /app/node_modules
     environment:
       - DATABASE_URL=postgresql://beacon:beacon@db:5432/beacon
       - REDIS_URL=redis://redis:6379

@@ -17,14 +17,12 @@ interface UptimeBarProps {
 export function UptimeBar({ dailyStats, days }: UptimeBarProps) {
   const [hoveredDay, setHoveredDay] = useState<number | null>(null);
 
-  // Build a map of day -> stats for quick lookup
   const statsMap = new Map<string, DailyStat>();
   for (const stat of dailyStats) {
     const day = new Date(stat.day).toISOString().split("T")[0];
     statsMap.set(day, stat);
   }
 
-  // Generate array of days
   const now = new Date();
   const segments = [];
   for (let i = days - 1; i >= 0; i--) {
@@ -33,33 +31,29 @@ export function UptimeBar({ dailyStats, days }: UptimeBarProps) {
     const dayKey = date.toISOString().split("T")[0];
     const stat = statsMap.get(dayKey);
 
-    let color = "bg-muted"; // no data
+    let color = "var(--sp-bar-empty)";
     let label = "No data";
 
     if (stat && stat.total > 0) {
       const upPercent = (stat.upCount / stat.total) * 100;
       if (upPercent >= 99) {
-        color = "bg-teal-500";
+        color = "var(--sp-bar-up)";
         label = `${upPercent.toFixed(1)}% uptime`;
       } else if (upPercent >= 95) {
-        color = "bg-amber-500";
-        label = `${upPercent.toFixed(1)}% uptime (degraded)`;
+        color = "var(--sp-bar-degraded)";
+        label = `${upPercent.toFixed(1)}% uptime`;
       } else {
-        color = "bg-red-500";
-        label = `${upPercent.toFixed(1)}% uptime (outage)`;
+        color = "var(--sp-bar-down)";
+        label = `${upPercent.toFixed(1)}% uptime`;
       }
-
       if (stat.avgResponse) {
-        label += ` | ${stat.avgResponse}ms avg`;
+        label += ` \u00b7 ${stat.avgResponse}ms avg`;
       }
     }
 
     segments.push({
       dayKey,
-      date: date.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      }),
+      date: date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       color,
       label,
     });
@@ -67,7 +61,7 @@ export function UptimeBar({ dailyStats, days }: UptimeBarProps) {
 
   return (
     <div className="relative">
-      <div className="flex gap-px">
+      <div className="flex gap-[2px]">
         {segments.map((seg, i) => (
           <div
             key={seg.dayKey}
@@ -76,20 +70,30 @@ export function UptimeBar({ dailyStats, days }: UptimeBarProps) {
             onMouseLeave={() => setHoveredDay(null)}
           >
             <div
-              className={`h-8 rounded-sm ${seg.color} transition-opacity hover:opacity-80 cursor-pointer`}
+              className={`h-6 rounded-[3px] transition-all duration-150 cursor-pointer ${
+                hoveredDay === i ? "opacity-100 scale-y-110" : "opacity-90 hover:opacity-100"
+              }`}
+              style={{ background: seg.color }}
             />
             {hoveredDay === i && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-10 bg-popover text-popover-foreground text-xs rounded-md px-3 py-2 whitespace-nowrap shadow-lg border">
+              <div
+                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-10 text-[11px] rounded-lg px-3 py-2 whitespace-nowrap shadow-xl"
+                style={{
+                  background: "var(--sp-tooltip-bg)",
+                  color: "var(--sp-text)",
+                  border: "1px solid var(--sp-border)",
+                }}
+              >
                 <p className="font-medium">{seg.date}</p>
-                <p className="text-muted-foreground">{seg.label}</p>
+                <p style={{ color: "var(--sp-text-2)" }}>{seg.label}</p>
               </div>
             )}
           </div>
         ))}
       </div>
-      <div className="flex justify-between mt-1.5">
-        <span className="text-xs text-muted-foreground">{days} days ago</span>
-        <span className="text-xs text-muted-foreground">Today</span>
+      <div className="flex justify-between mt-2">
+        <span className="text-[10px]" style={{ color: "var(--sp-text-3)" }}>{days} days ago</span>
+        <span className="text-[10px]" style={{ color: "var(--sp-text-3)" }}>Today</span>
       </div>
     </div>
   );

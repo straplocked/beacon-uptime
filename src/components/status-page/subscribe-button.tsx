@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Bell } from "lucide-react";
 
 export function SubscribeButton({ slug }: { slug: string }) {
@@ -32,7 +31,7 @@ export function SubscribeButton({ slug }: { slug: string }) {
 
   if (status === "success") {
     return (
-      <span className="text-sm text-teal-600">
+      <span className="text-xs" style={{ color: "var(--sp-accent)" }}>
         Check your email to confirm!
       </span>
     );
@@ -40,15 +39,28 @@ export function SubscribeButton({ slug }: { slug: string }) {
 
   if (!showForm) {
     return (
-      <Button
-        variant="outline"
-        size="sm"
+      <button
         onClick={() => setShowForm(true)}
-        className="text-sm"
+        className="flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 transition-all"
+        style={{
+          color: "var(--sp-text-3)",
+          border: "1px solid var(--sp-border)",
+          fontFamily: "var(--sp-font)",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = "var(--sp-text-2)";
+          e.currentTarget.style.borderColor = "var(--sp-text-3)";
+          e.currentTarget.style.background = "var(--sp-surface)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = "var(--sp-text-3)";
+          e.currentTarget.style.borderColor = "var(--sp-border)";
+          e.currentTarget.style.background = "transparent";
+        }}
       >
-        <Bell className="h-3.5 w-3.5 mr-1.5" />
+        <Bell className="h-3 w-3" />
         Subscribe
-      </Button>
+      </button>
     );
   }
 
@@ -60,11 +72,26 @@ export function SubscribeButton({ slug }: { slug: string }) {
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         required
-        className="text-sm px-3 py-1.5 border rounded-md w-48"
+        className="text-xs px-3 py-1.5 rounded-lg w-48 focus:outline-none transition-colors"
+        style={{
+          background: "var(--sp-input-bg)",
+          border: "1px solid var(--sp-input-border)",
+          color: "var(--sp-text)",
+          fontFamily: "var(--sp-font)",
+        }}
       />
-      <Button type="submit" size="sm" disabled={status === "loading"}>
+      <button
+        type="submit"
+        disabled={status === "loading"}
+        className="text-xs px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+        style={{
+          background: "var(--sp-accent-subtle)",
+          color: "var(--sp-accent)",
+          border: "1px solid var(--sp-accent-border)",
+        }}
+      >
         {status === "loading" ? "..." : "Subscribe"}
-      </Button>
+      </button>
     </form>
   );
 }
