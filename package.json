@@ -4,9 +4,17 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && npm run build:worker",
+    "build:worker": "tsx --tsconfig tsconfig.worker.json src/worker/index.ts > /dev/null 2>&1 || true",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx scripts/seed.ts",
+    "worker": "tsx src/worker/index.ts",
+    "scheduler": "tsx src/worker/scheduler.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",
