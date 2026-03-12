@@ -11,6 +11,7 @@ interface DailyStat {
 
 interface ComponentRowProps {
   name: string;
+  target: string;
   status: string;
   uptimePercent: string | null;
   dailyStats: DailyStat[];
@@ -21,6 +22,7 @@ interface ComponentRowProps {
 
 export function ComponentRow({
   name,
+  target,
   status,
   uptimePercent,
   dailyStats,
@@ -41,9 +43,12 @@ export function ComponentRow({
   return (
     <div className="p-4">
       <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <span className={`h-2 w-2 rounded-full ${config.icon}`} />
-          <span className="font-medium text-foreground text-sm">{name}</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`h-2 w-2 shrink-0 rounded-full ${config.icon}`} />
+          <div className="min-w-0">
+            <span className="font-medium text-foreground text-sm">{name}</span>
+            <span className="block text-xs text-muted-foreground truncate">{target}</span>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <span className={`text-sm font-medium ${config.color}`}>

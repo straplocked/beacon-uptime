@@ -117,6 +117,7 @@ export default async function PublicStatusPage({
       return {
         id: monitor.id,
         name: spm.displayName || monitor.name,
+        target: monitor.target,
         group: spm.groupName,
         status: monitor.status,
         uptimePercent,
@@ -219,6 +220,7 @@ export default async function PublicStatusPage({
                 <ComponentRow
                   key={mon.id}
                   name={mon.name}
+                  target={mon.target}
                   status={mon.status}
                   uptimePercent={mon.uptimePercent}
                   dailyStats={mon.dailyStats}
