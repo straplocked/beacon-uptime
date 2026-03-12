@@ -54,11 +54,11 @@ export function EditableName({
 
   if (!editing) {
     return (
-      <div className="flex items-center gap-2 group">
+      <div className="flex items-center gap-2">
         <h1 className="text-2xl font-bold">{initialName}</h1>
         <button
           onClick={() => setEditing(true)}
-          className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+          className="text-muted-foreground/50 hover:text-foreground transition-colors"
         >
           <Pencil className="h-4 w-4" />
         </button>
