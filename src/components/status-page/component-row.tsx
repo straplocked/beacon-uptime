@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { UptimeBar } from "./uptime-bar";
+import { ChartRow } from "./chart-row";
+import { CompactRow } from "./compact-row";
+import type { DisplayStyle } from "@/lib/types/footer";
 
 interface DailyStat {
   day: string;
@@ -35,9 +38,56 @@ interface ComponentRowProps {
   showUptime: boolean;
   showResponseTime: boolean;
   days: number;
+  displayStyle?: DisplayStyle;
 }
 
-export function ComponentRow({
+function statusStyle(status: string) {
+  switch (status) {
+    case "up": return { color: "var(--sp-accent)", dot: "var(--sp-accent)" };
+    case "down": return { color: "var(--sp-danger)", dot: "var(--sp-danger)" };
+    case "degraded": return { color: "var(--sp-warning)", dot: "var(--sp-warning)" };
+    default: return { color: "var(--sp-text-3)", dot: "var(--sp-text-4)" };
+  }
+}
+
+const statusLabel: Record<string, string> = {
+  up: "Operational",
+  down: "Down",
+  degraded: "Degraded",
+  paused: "Paused",
+  pending: "Pending",
+};
+
+const checkDotColor: Record<string, string> = {
+  up: "var(--sp-accent)",
+  down: "var(--sp-danger)",
+  degraded: "var(--sp-warning)",
+};
+
+export function ComponentRow(props: ComponentRowProps) {
+  const { displayStyle = "bars" } = props;
+
+  if (displayStyle === "chart") {
+    return <ChartRow {...props} />;
+  }
+
+  if (displayStyle === "compact") {
+    return (
+      <CompactRow
+        name={props.name}
+        status={props.status}
+        uptimePercent={props.uptimePercent}
+        dailyStats={props.dailyStats}
+        showUptime={props.showUptime}
+        days={props.days}
+      />
+    );
+  }
+
+  return <BarsRow {...props} />;
+}
+
+function BarsRow({
   name,
   target,
   type,
@@ -55,22 +105,7 @@ export function ComponentRow({
   days,
 }: ComponentRowProps) {
   const [expanded, setExpanded] = useState(false);
-
-  const statusConfig: Record<string, { label: string; color: string; icon: string }> = {
-    up: { label: "Operational", color: "text-teal-600", icon: "bg-teal-500" },
-    down: { label: "Down", color: "text-red-600", icon: "bg-red-500" },
-    degraded: { label: "Degraded", color: "text-amber-600", icon: "bg-amber-500" },
-    paused: { label: "Paused", color: "text-slate-400", icon: "bg-slate-400" },
-    pending: { label: "Pending", color: "text-slate-400", icon: "bg-slate-300" },
-  };
-
-  const checkStatusColor: Record<string, string> = {
-    up: "bg-teal-500",
-    down: "bg-red-500",
-    degraded: "bg-amber-500",
-  };
-
-  const config = statusConfig[status] || statusConfig.pending;
+  const sty = statusStyle(status);
 
   function formatInterval(s: number) {
     if (s < 60) return `${s}s`;
@@ -93,27 +128,47 @@ export function ComponentRow({
     <div>
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full text-left p-4 hover:bg-muted/30 transition-colors"
+        className="w-full text-left p-4 transition-colors"
+        style={{ fontFamily: "var(--sp-font)" }}
+        onMouseEnter={(e) => e.currentTarget.style.background = "var(--sp-surface-hover)"}
+        onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
       >
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className={`h-2 w-2 shrink-0 rounded-full ${config.icon}`} />
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{
+                background: sty.dot,
+                boxShadow: status === "up" || status === "down" || status === "degraded"
+                  ? `var(--sp-status-glow) ${sty.dot}`
+                  : "none",
+              }}
+            />
             <div className="min-w-0">
-              <span className="font-medium text-foreground text-sm">{name}</span>
-              <span className="block text-xs text-muted-foreground truncate">{target}</span>
+              <span className="font-medium text-sm" style={{ color: "var(--sp-text)" }}>{name}</span>
+              <span
+                className="block text-[11px] truncate"
+                style={{ color: "var(--sp-text-3)", fontFamily: "var(--sp-mono)" }}
+              >
+                {target}
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className={`text-sm font-medium ${config.color}`}>
-              {config.label}
+            <span className="text-xs font-medium" style={{ color: sty.color }}>
+              {statusLabel[status] || "Unknown"}
             </span>
             {showUptime && uptimePercent && (
-              <span className="text-sm text-muted-foreground">{uptimePercent}%</span>
+              <span
+                className="text-xs tabular-nums"
+                style={{ color: "var(--sp-text-3)", fontFamily: "var(--sp-mono)" }}
+              >
+                {uptimePercent}%
+              </span>
             )}
             <ChevronDown
-              className={`h-4 w-4 text-muted-foreground transition-transform ${
-                expanded ? "rotate-180" : ""
-              }`}
+              className={`h-3.5 w-3.5 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+              style={{ color: "var(--sp-text-3)" }}
             />
           </div>
         </div>
@@ -122,53 +177,52 @@ export function ComponentRow({
 
       {expanded && (
         <div className="px-4 pb-4 space-y-4">
-          {/* Stats row */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-muted/40 rounded-lg p-3">
-              <p className="text-xs text-muted-foreground">Avg Response</p>
-              <p className="text-sm font-semibold">
-                {avgResponse != null ? `${avgResponse}ms` : "—"}
-              </p>
-            </div>
-            <div className="bg-muted/40 rounded-lg p-3">
-              <p className="text-xs text-muted-foreground">Min / Max</p>
-              <p className="text-sm font-semibold">
-                {minResponse != null && maxResponse != null
-                  ? `${minResponse}ms / ${maxResponse}ms`
-                  : "—"}
-              </p>
-            </div>
-            <div className="bg-muted/40 rounded-lg p-3">
-              <p className="text-xs text-muted-foreground">Check Interval</p>
-              <p className="text-sm font-semibold">{formatInterval(intervalSeconds)}</p>
-            </div>
-            <div className="bg-muted/40 rounded-lg p-3">
-              <p className="text-xs text-muted-foreground">Last Checked</p>
-              <p className="text-sm font-semibold">
-                {lastCheckedAt ? timeAgo(lastCheckedAt) : "—"}
-              </p>
-            </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[
+              { label: "Avg Response", value: avgResponse != null ? `${avgResponse}ms` : "\u2014" },
+              { label: "Min / Max", value: minResponse != null && maxResponse != null ? `${minResponse} / ${maxResponse}ms` : "\u2014" },
+              { label: "Interval", value: formatInterval(intervalSeconds) },
+              { label: "Last Check", value: lastCheckedAt ? timeAgo(lastCheckedAt) : "\u2014" },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                className="rounded-lg p-3"
+                style={{ background: "var(--sp-surface)", border: "1px solid var(--sp-border)" }}
+              >
+                <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: "var(--sp-text-3)" }}>
+                  {stat.label}
+                </p>
+                <p
+                  className="text-sm font-semibold tabular-nums"
+                  style={{ color: "var(--sp-text-2)", fontFamily: "var(--sp-mono)" }}
+                >
+                  {stat.value}
+                </p>
+              </div>
+            ))}
           </div>
 
-          {/* Recent checks */}
           {recentChecks.length > 0 && (
             <div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+              <p
+                className="text-[10px] font-semibold uppercase tracking-[0.15em] mb-2"
+                style={{ color: "var(--sp-text-3)" }}
+              >
                 Recent Checks
               </p>
-              <div className="space-y-1">
+              <div className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--sp-border)" }}>
                 {recentChecks.map((check, i) => (
                   <div
                     key={i}
-                    className="flex items-center justify-between text-xs py-1.5 px-2 rounded hover:bg-muted/30"
+                    className="flex items-center justify-between text-xs py-2 px-3"
+                    style={{ background: i % 2 === 0 ? "var(--sp-surface)" : "transparent" }}
                   >
                     <div className="flex items-center gap-2">
                       <span
-                        className={`h-1.5 w-1.5 rounded-full ${
-                          checkStatusColor[check.status] || "bg-slate-300"
-                        }`}
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ background: checkDotColor[check.status] || "var(--sp-text-4)" }}
                       />
-                      <span className="text-muted-foreground font-mono">
+                      <span style={{ color: "var(--sp-text-3)", fontFamily: "var(--sp-mono)" }} suppressHydrationWarning>
                         {new Date(check.time).toLocaleString(undefined, {
                           month: "short",
                           day: "numeric",
@@ -180,14 +234,22 @@ export function ComponentRow({
                     </div>
                     <div className="flex items-center gap-3">
                       {check.statusCode && (
-                        <span className="text-muted-foreground">{check.statusCode}</span>
+                        <span style={{ color: "var(--sp-text-4)", fontFamily: "var(--sp-mono)" }}>
+                          {check.statusCode}
+                        </span>
                       )}
                       {check.responseTimeMs != null && (
-                        <span className="text-foreground font-medium tabular-nums w-16 text-right">
+                        <span
+                          className="font-medium tabular-nums w-16 text-right"
+                          style={{ color: "var(--sp-text-2)", fontFamily: "var(--sp-mono)" }}
+                        >
                           {check.responseTimeMs}ms
                         </span>
                       )}
-                      <span className="text-muted-foreground/60 w-14 text-right">
+                      <span
+                        className="w-14 text-right text-[10px]"
+                        style={{ color: "var(--sp-text-4)", fontFamily: "var(--sp-mono)" }}
+                      >
                         {check.region}
                       </span>
                     </div>

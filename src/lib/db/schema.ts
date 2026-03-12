@@ -11,6 +11,7 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
+import type { FooterConfig } from "@/lib/types/footer";
 
 // ─── Enums ──────────────────────────────────────────────────────
 
@@ -162,10 +163,12 @@ export const statusPages = pgTable(
     customDomain: text("custom_domain").unique(),
     logoUrl: text("logo_url"),
     faviconUrl: text("favicon_url"),
+    theme: text("theme").default("midnight").notNull(),
     brandColor: text("brand_color").default("#14b8a6").notNull(),
     customCss: text("custom_css"),
     headerText: text("header_text"),
     footerText: text("footer_text"),
+    footerConfig: jsonb("footer_config").$type<FooterConfig>(),
     showUptimePercentage: boolean("show_uptime_percentage")
       .default(true)
       .notNull(),
@@ -200,6 +203,7 @@ export const statusPageMonitors = pgTable(
     displayName: text("display_name"),
     sortOrder: integer("sort_order").default(0).notNull(),
     groupName: text("group_name"),
+    displayStyle: text("display_style").default("bars").notNull(),
   },
   (table) => [
     index("spm_status_page_id_idx").on(table.statusPageId),

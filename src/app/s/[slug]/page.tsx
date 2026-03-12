@@ -15,9 +15,17 @@ import { UptimeBar } from "@/components/status-page/uptime-bar";
 import { ComponentRow } from "@/components/status-page/component-row";
 import { IncidentCard } from "@/components/status-page/incident-card";
 import { SubscribeButton } from "@/components/status-page/subscribe-button";
+import { StatusPageFooter } from "@/components/status-page/footer";
+import type { FooterConfig } from "@/lib/types/footer";
+import type { DisplayStyle } from "@/lib/types/footer";
+import {
+  getThemeCSS,
+  getThemeWrapperClass,
+  isLightTheme,
+  type StatusTheme,
+} from "@/lib/status-themes";
 
 async function getStatusPage(slug: string) {
-  // First try slug, then check if it's a custom domain
   let [page] = await db
     .select()
     .from(statusPages)
@@ -47,12 +55,10 @@ export default async function PublicStatusPage({
 }) {
   const { slug } = await params;
 
-  // Check for custom domain first
   const headerList = await headers();
   const host = headerList.get("host") || "";
   let page = null;
 
-  // If the host looks like a custom domain (not our main domain)
   if (
     !host.includes("pluginsynthesis.com") &&
     !host.includes("localhost")
@@ -60,12 +66,16 @@ export default async function PublicStatusPage({
     page = await getStatusPageByDomain(host);
   }
 
-  // Fall back to slug-based lookup
   if (!page) {
     page = await getStatusPage(slug);
   }
 
   if (!page) notFound();
+
+  const theme = (page.theme || "midnight") as StatusTheme;
+  const themeCSS = getThemeCSS(theme);
+  const wrapperClass = getThemeWrapperClass(theme);
+  const light = isLightTheme(theme);
 
   // Get linked monitors with their status
   const linkedMonitors = await db
@@ -78,11 +88,9 @@ export default async function PublicStatusPage({
     .where(eq(statusPageMonitors.statusPageId, page.id))
     .orderBy(statusPageMonitors.sortOrder);
 
-  // Get daily uptime data for each monitor (last N days)
   const days = page.showHistoryDays;
   const monitorData = await Promise.all(
     linkedMonitors.map(async ({ spm, monitor }) => {
-      // Get daily stats
       const dailyStats = await db.execute(sql`
         SELECT
           time_bucket('1 day', time) AS day,
@@ -96,7 +104,6 @@ export default async function PublicStatusPage({
         ORDER BY day ASC
       `);
 
-      // Overall uptime + response stats
       const overallStats = await db.execute(sql`
         SELECT
           COUNT(*) AS total,
@@ -109,7 +116,6 @@ export default async function PublicStatusPage({
           AND time > NOW() - ${days + ' days'}::interval
       `);
 
-      // Recent checks for detail view
       const recentChecks = await db
         .select()
         .from(checkResults)
@@ -120,9 +126,7 @@ export default async function PublicStatusPage({
       const overall = overallStats[0] as any;
       const uptimePercent =
         overall?.total > 0
-          ? ((Number(overall.up_count) / Number(overall.total)) * 100).toFixed(
-              2
-            )
+          ? ((Number(overall.up_count) / Number(overall.total)) * 100).toFixed(2)
           : null;
 
       return {
@@ -131,6 +135,7 @@ export default async function PublicStatusPage({
         target: monitor.target,
         type: monitor.type,
         group: spm.groupName,
+        displayStyle: (spm.displayStyle || "bars") as DisplayStyle,
         status: monitor.status,
         intervalSeconds: monitor.intervalSeconds,
         lastCheckedAt: monitor.lastCheckedAt?.toISOString() || null,
@@ -155,7 +160,6 @@ export default async function PublicStatusPage({
     })
   );
 
-  // Get recent incidents
   const recentIncidents = await db
     .select()
     .from(incidents)
@@ -163,7 +167,6 @@ export default async function PublicStatusPage({
     .orderBy(desc(incidents.createdAt))
     .limit(10);
 
-  // Get updates for each incident
   const incidentData = await Promise.all(
     recentIncidents.map(async (incident) => {
       const updates = await db
@@ -176,7 +179,6 @@ export default async function PublicStatusPage({
     })
   );
 
-  // Determine overall status
   const hasDown = monitorData.some((m) => m.status === "down");
   const hasDegraded = monitorData.some((m) => m.status === "degraded");
   const overallStatus = hasDown
@@ -191,11 +193,23 @@ export default async function PublicStatusPage({
     major_outage: "Major System Outage",
   };
 
-  const overallStatusColor: Record<string, string> = {
-    operational: "bg-teal-500",
-    degraded: "bg-amber-500",
-    major_outage: "bg-red-500",
-  };
+  function bannerStyle(s: string) {
+    switch (s) {
+      case "operational": return { borderColor: "var(--sp-accent-border)", background: "var(--sp-accent-subtle)", color: "var(--sp-accent)" };
+      case "degraded": return { borderColor: "var(--sp-warning-border)", background: "var(--sp-warning-subtle)", color: "var(--sp-warning)" };
+      case "major_outage": return { borderColor: "var(--sp-danger-border)", background: "var(--sp-danger-subtle)", color: "var(--sp-danger)" };
+      default: return { borderColor: "var(--sp-border)", background: "var(--sp-surface)", color: "var(--sp-text)" };
+    }
+  }
+
+  function pulseClass(s: string) {
+    switch (s) {
+      case "operational": return "status-pulse-accent";
+      case "degraded": return "status-pulse-warning";
+      case "major_outage": return "status-pulse-danger";
+      default: return "";
+    }
+  }
 
   // Group monitors
   const groups = new Map<string, typeof monitorData>();
@@ -205,74 +219,137 @@ export default async function PublicStatusPage({
     groups.get(group)!.push(mon);
   }
 
+  const banner = bannerStyle(overallStatus);
+
   return (
     <div
-      className="min-h-screen bg-background"
-      style={{ "--brand-color": page.brandColor } as React.CSSProperties}
+      className={wrapperClass}
+      data-sp-theme={theme}
+      style={{
+        background: "var(--sp-bg)",
+        color: "var(--sp-text)",
+        fontFamily: "var(--sp-font)",
+      } as React.CSSProperties}
     >
+      <style>{`[data-sp-theme="${theme}"]{${themeCSS}}`}</style>
       {page.customCss && <style>{page.customCss}</style>}
 
-      <div className="max-w-3xl mx-auto px-4 py-8">
+      {/* Ambient glow orbs (hidden on light themes) */}
+      {!light && (
+        <>
+          <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+            <div
+              className="absolute w-[600px] h-[600px] rounded-full -top-[15%] -right-[10%]"
+              style={{ background: "var(--sp-glow-1)", filter: "blur(100px)" }}
+            />
+            <div
+              className="absolute w-[500px] h-[500px] rounded-full -bottom-[10%] -left-[8%]"
+              style={{ background: "var(--sp-glow-2)", filter: "blur(100px)" }}
+            />
+          </div>
+          <div
+            className="fixed inset-0 opacity-[0.015] pointer-events-none z-[1]"
+            style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")" }}
+          />
+        </>
+      )}
+
+      {/* Terminal scanlines */}
+      {theme === "terminal" && (
+        <div className="fixed inset-0 pointer-events-none z-[1] opacity-[0.03]"
+          style={{
+            backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.3) 2px, rgba(0,0,0,0.3) 4px)",
+          }}
+        />
+      )}
+
+      <div className="relative z-[2] max-w-3xl mx-auto px-4 py-12">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-10">
           <div className="flex items-center gap-3">
             {page.logoUrl && (
               <img src={page.logoUrl} alt="" className="h-8" />
             )}
-            <h1 className="text-xl font-bold text-foreground">{page.name}</h1>
+            <h1
+              className="text-xl tracking-wide uppercase"
+              style={{ color: "var(--sp-text)", fontFamily: theme === "terminal" ? "var(--sp-mono)" : "var(--font-space-grotesk, 'Space Grotesk'), sans-serif", fontWeight: 700 }}
+            >
+              {page.name}
+            </h1>
           </div>
           <SubscribeButton slug={page.slug} />
         </div>
 
-        {/* Overall status */}
+        {/* Overall status banner */}
         <div
-          className={`rounded-lg p-4 mb-8 text-white ${overallStatusColor[overallStatus]}`}
+          className="relative rounded-xl p-5 mb-10 backdrop-blur-sm"
+          style={{ background: banner.background, border: `1px solid ${banner.borderColor}` }}
         >
-          <p className="font-semibold text-lg">
-            {overallStatusText[overallStatus]}
-          </p>
+          <div className="flex items-center gap-3">
+            <span
+              className={`h-2.5 w-2.5 rounded-full shrink-0 ${pulseClass(overallStatus)}`}
+              style={{ background: banner.color }}
+            />
+            <p className="font-semibold text-lg" style={{ color: banner.color }}>
+              {overallStatusText[overallStatus]}
+            </p>
+          </div>
         </div>
 
         {/* Components by group */}
         {Array.from(groups.entries()).map(([groupName, groupMonitors]) => (
-          <div key={groupName} className="mb-8">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+          <div key={groupName} className="mb-10">
+            <h2
+              className="text-[11px] font-semibold uppercase tracking-[0.15em] mb-3 pl-1"
+              style={{ color: "var(--sp-text-3)" }}
+            >
               {groupName}
             </h2>
-            <div className="bg-card rounded-lg border divide-y">
-              {groupMonitors.map((mon) => (
-                <ComponentRow
-                  key={mon.id}
-                  name={mon.name}
-                  target={mon.target}
-                  type={mon.type}
-                  status={mon.status}
-                  uptimePercent={mon.uptimePercent}
-                  avgResponse={mon.avgResponse}
-                  minResponse={mon.minResponse}
-                  maxResponse={mon.maxResponse}
-                  intervalSeconds={mon.intervalSeconds}
-                  lastCheckedAt={mon.lastCheckedAt}
-                  dailyStats={mon.dailyStats}
-                  recentChecks={mon.recentChecks}
-                  showUptime={page.showUptimePercentage}
-                  showResponseTime={page.showResponseTime}
-                  days={page.showHistoryDays}
-                />
+            <div
+              className="rounded-xl backdrop-blur-sm"
+              style={{ background: "var(--sp-surface)", border: `1px solid var(--sp-border)` }}
+            >
+              {groupMonitors.map((mon, i) => (
+                <div key={mon.id}>
+                  {i > 0 && <div style={{ borderTop: `1px solid var(--sp-divider)` }} />}
+                  <ComponentRow
+                    name={mon.name}
+                    target={mon.target}
+                    type={mon.type}
+                    status={mon.status}
+                    uptimePercent={mon.uptimePercent}
+                    avgResponse={mon.avgResponse}
+                    minResponse={mon.minResponse}
+                    maxResponse={mon.maxResponse}
+                    intervalSeconds={mon.intervalSeconds}
+                    lastCheckedAt={mon.lastCheckedAt}
+                    dailyStats={mon.dailyStats}
+                    recentChecks={mon.recentChecks}
+                    showUptime={page.showUptimePercentage}
+                    showResponseTime={page.showResponseTime}
+                    days={page.showHistoryDays}
+                    displayStyle={mon.displayStyle}
+                  />
+                </div>
               ))}
             </div>
           </div>
         ))}
 
         {/* Incidents */}
-        <div className="mt-12">
-          <h2 className="text-lg font-semibold text-foreground mb-4">
+        <div className="mt-16">
+          <h2
+            className="text-[11px] font-semibold uppercase tracking-[0.15em] mb-4 pl-1"
+            style={{ color: "var(--sp-text-3)" }}
+          >
             Past Incidents
           </h2>
           {incidentData.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No incidents reported.</p>
+            <p className="text-sm pl-1" style={{ color: "var(--sp-text-3)" }}>
+              No incidents reported.
+            </p>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {incidentData.map((incident) => (
                 <IncidentCard
                   key={incident.id}
@@ -293,31 +370,11 @@ export default async function PublicStatusPage({
         </div>
 
         {/* Footer */}
-        <div className="mt-16 pt-8 border-t text-center text-sm text-muted-foreground">
-          {page.footerText && (
-            <p className="mb-2">{page.footerText}</p>
-          )}
-          <div className="flex items-center justify-center gap-4">
-            <a
-              href={`/s/${page.slug}/rss`}
-              className="text-muted-foreground hover:text-foreground"
-              title="RSS Feed"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 11a9 9 0 0 1 9 9" /><path d="M4 4a16 16 0 0 1 16 16" /><circle cx="5" cy="19" r="1" />
-              </svg>
-            </a>
-            <p>
-              Powered by{" "}
-              <a
-                href="https://beacon.pluginsynthesis.com"
-                className="text-muted-foreground hover:text-foreground"
-              >
-                Beacon
-              </a>
-            </p>
-          </div>
-        </div>
+        <StatusPageFooter
+          slug={page.slug}
+          footerText={page.footerText}
+          footerConfig={(page as any).footerConfig as FooterConfig | null}
+        />
       </div>
     </div>
   );

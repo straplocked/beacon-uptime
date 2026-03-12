@@ -9,6 +9,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { STATUS_THEMES, themeMeta, type StatusTheme } from "@/lib/status-themes";
+import type { FooterConfig, FooterItem, FooterSection } from "@/lib/types/footer";
+import { Plus, Trash2, Type, Copyright, ExternalLink } from "lucide-react";
 
 interface MonitorOption {
   id: string;
@@ -22,6 +32,7 @@ interface MonitorLink {
   displayName: string;
   sortOrder: number;
   groupName: string;
+  displayStyle: string;
 }
 
 interface StatusPageData {
@@ -31,10 +42,12 @@ interface StatusPageData {
   customDomain: string | null;
   logoUrl: string | null;
   faviconUrl: string | null;
+  theme: string;
   brandColor: string;
   customCss: string | null;
   headerText: string | null;
   footerText: string | null;
+  footerConfig?: FooterConfig | null;
   showUptimePercentage: boolean;
   showResponseTime: boolean;
   showHistoryDays: number;
@@ -46,6 +59,7 @@ interface LinkedMonitor {
   displayName: string | null;
   sortOrder: number;
   groupName: string | null;
+  displayStyle?: string;
 }
 
 interface StatusPageFormProps {
@@ -55,11 +69,41 @@ interface StatusPageFormProps {
   plan?: string;
 }
 
+type SectionKey = "left" | "center" | "right";
+
+const EMPTY_FOOTER_CONFIG: FooterConfig = {
+  sections: {},
+  showPoweredBy: true,
+  showRss: true,
+};
+
 function toSlug(name: string): string {
   return name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function itemPreview(item: FooterItem): string {
+  switch (item.type) {
+    case "text":
+      return item.content;
+    case "copyright":
+      return `\u00a9 ${item.companyName}`;
+    case "link":
+      return item.label;
+  }
+}
+
+function itemIcon(type: FooterItem["type"]) {
+  switch (type) {
+    case "text":
+      return <Type className="h-3 w-3" />;
+    case "copyright":
+      return <Copyright className="h-3 w-3" />;
+    case "link":
+      return <ExternalLink className="h-3 w-3" />;
+  }
 }
 
 export function StatusPageForm({
@@ -86,6 +130,10 @@ export function StatusPageForm({
     initialData?.footerText || ""
   );
   const [isPublic, setIsPublic] = useState(initialData?.isPublic ?? true);
+  const resolvedTheme = (initialData?.theme && STATUS_THEMES.includes(initialData.theme as StatusTheme))
+    ? initialData.theme as StatusTheme
+    : "midnight";
+  const [theme, setTheme] = useState<StatusTheme>(resolvedTheme);
   const [brandColor, setBrandColor] = useState(
     initialData?.brandColor || "#14b8a6"
   );
@@ -107,6 +155,22 @@ export function StatusPageForm({
     initialData?.showHistoryDays ?? 90
   );
 
+  // Footer config state
+  const [footerConfig, setFooterConfig] = useState<FooterConfig>(
+    initialData?.footerConfig || EMPTY_FOOTER_CONFIG
+  );
+  const [useFooterConfig, setUseFooterConfig] = useState(
+    !!initialData?.footerConfig
+  );
+
+  // Adding items state
+  const [addingTo, setAddingTo] = useState<SectionKey | null>(null);
+  const [addItemType, setAddItemType] = useState<FooterItem["type"]>("text");
+  const [addTextContent, setAddTextContent] = useState("");
+  const [addCompanyName, setAddCompanyName] = useState("");
+  const [addLinkLabel, setAddLinkLabel] = useState("");
+  const [addLinkUrl, setAddLinkUrl] = useState("");
+
   // Monitor selection
   const [selectedMonitors, setSelectedMonitors] = useState<MonitorLink[]>(
     () =>
@@ -115,6 +179,7 @@ export function StatusPageForm({
         displayName: m.displayName || "",
         sortOrder: m.sortOrder,
         groupName: m.groupName || "",
+        displayStyle: m.displayStyle || "bars",
       })) || []
   );
 
@@ -148,6 +213,7 @@ export function StatusPageForm({
           displayName: "",
           sortOrder: prev.length,
           groupName: "",
+          displayStyle: "bars",
         },
       ];
     });
@@ -165,6 +231,55 @@ export function StatusPageForm({
     );
   }
 
+  // Footer helpers
+  function getSectionItems(key: SectionKey): FooterItem[] {
+    return footerConfig.sections[key]?.items || [];
+  }
+
+  function updateSection(key: SectionKey, items: FooterItem[]) {
+    setFooterConfig((prev) => ({
+      ...prev,
+      sections: {
+        ...prev.sections,
+        [key]: items.length > 0 ? { items } : undefined,
+      },
+    }));
+  }
+
+  function removeItem(key: SectionKey, index: number) {
+    const items = getSectionItems(key).filter((_, i) => i !== index);
+    updateSection(key, items);
+  }
+
+  function addItem(key: SectionKey) {
+    let newItem: FooterItem;
+    switch (addItemType) {
+      case "text":
+        if (!addTextContent.trim()) return;
+        newItem = { type: "text", content: addTextContent.trim() };
+        break;
+      case "copyright":
+        if (!addCompanyName.trim()) return;
+        newItem = { type: "copyright", companyName: addCompanyName.trim() };
+        break;
+      case "link":
+        if (!addLinkLabel.trim() || !addLinkUrl.trim()) return;
+        newItem = { type: "link", label: addLinkLabel.trim(), url: addLinkUrl.trim() };
+        break;
+    }
+
+    const items = [...getSectionItems(key), newItem];
+    updateSection(key, items);
+
+    // Reset
+    setAddingTo(null);
+    setAddTextContent("");
+    setAddCompanyName("");
+    setAddLinkLabel("");
+    setAddLinkUrl("");
+    setAddItemType("text");
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -173,6 +288,7 @@ export function StatusPageForm({
     const body = {
       name,
       slug,
+      theme,
       customDomain: canCustomDomain && customDomain ? customDomain : null,
       logoUrl: logoUrl || null,
       faviconUrl: faviconUrl || null,
@@ -180,6 +296,7 @@ export function StatusPageForm({
       customCss: canCustomCss && customCss ? customCss : null,
       headerText: headerText || null,
       footerText: footerText || null,
+      footerConfig: useFooterConfig ? footerConfig : null,
       showUptimePercentage,
       showResponseTime,
       showHistoryDays,
@@ -189,6 +306,7 @@ export function StatusPageForm({
         displayName: m.displayName || undefined,
         sortOrder: m.sortOrder,
         groupName: m.groupName || undefined,
+        displayStyle: m.displayStyle,
       })),
     };
 
@@ -242,6 +360,133 @@ export function StatusPageForm({
     }
   }
 
+  function renderFooterSection(key: SectionKey, label: string) {
+    const items = getSectionItems(key);
+
+    return (
+      <div className="space-y-2">
+        <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+          {label}
+        </Label>
+
+        {items.length > 0 && (
+          <div className="space-y-1">
+            {items.map((item, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+              >
+                <span className="text-muted-foreground">
+                  {itemIcon(item.type)}
+                </span>
+                <span className="flex-1 truncate">{itemPreview(item)}</span>
+                <button
+                  type="button"
+                  onClick={() => removeItem(key, i)}
+                  className="text-muted-foreground hover:text-destructive transition-colors"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {addingTo === key ? (
+          <div className="space-y-2 rounded-md border p-3">
+            <div className="flex gap-2">
+              <Select
+                value={addItemType}
+                onValueChange={(v) => {
+                  if (v) setAddItemType(v as FooterItem["type"]);
+                }}
+              >
+                <SelectTrigger className="w-[130px] h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="text">Text</SelectItem>
+                  <SelectItem value="copyright">Copyright</SelectItem>
+                  <SelectItem value="link">Link</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {addItemType === "text" && (
+              <Input
+                value={addTextContent}
+                onChange={(e) => setAddTextContent(e.target.value)}
+                placeholder="Footer text..."
+                className="h-8 text-sm"
+              />
+            )}
+
+            {addItemType === "copyright" && (
+              <Input
+                value={addCompanyName}
+                onChange={(e) => setAddCompanyName(e.target.value)}
+                placeholder="Company name"
+                className="h-8 text-sm"
+              />
+            )}
+
+            {addItemType === "link" && (
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  value={addLinkLabel}
+                  onChange={(e) => setAddLinkLabel(e.target.value)}
+                  placeholder="Label"
+                  className="h-8 text-sm"
+                />
+                <Input
+                  value={addLinkUrl}
+                  onChange={(e) => setAddLinkUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="h-8 text-sm"
+                />
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => addItem(key)}
+              >
+                Add
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setAddingTo(null)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          items.length < 10 && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setAddingTo(key);
+                setAddItemType("text");
+              }}
+            >
+              <Plus className="h-3.5 w-3.5 mr-1" />
+              Add Item
+            </Button>
+          )
+        )}
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit}>
       {error && (
@@ -258,6 +503,7 @@ export function StatusPageForm({
           </TabsTrigger>
           <TabsTrigger value="branding">Branding</TabsTrigger>
           <TabsTrigger value="display">Display</TabsTrigger>
+          <TabsTrigger value="footer">Footer</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general">
@@ -299,16 +545,6 @@ export function StatusPageForm({
                   value={headerText}
                   onChange={(e) => setHeaderText(e.target.value)}
                   placeholder="All systems operational"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="footerText">Footer Text</Label>
-                <Input
-                  id="footerText"
-                  value={footerText}
-                  onChange={(e) => setFooterText(e.target.value)}
-                  placeholder="Powered by Beacon"
                 />
               </div>
 
@@ -354,7 +590,7 @@ export function StatusPageForm({
                         </div>
                       </div>
                       {selected && (
-                        <div className="mt-3 grid grid-cols-3 gap-3 pl-7">
+                        <div className="mt-3 grid grid-cols-4 gap-3 pl-7">
                           <div className="space-y-1">
                             <Label className="text-xs">Display Name</Label>
                             <Input
@@ -401,6 +637,35 @@ export function StatusPageForm({
                               min={0}
                             />
                           </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Display Style</Label>
+                            <Select
+                              value={selected.displayStyle}
+                              onValueChange={(v) => {
+                                if (v)
+                                  updateMonitorLink(
+                                    monitor.id,
+                                    "displayStyle",
+                                    v
+                                  );
+                              }}
+                            >
+                              <SelectTrigger className="h-8 text-sm">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="bars">
+                                  Uptime Bars
+                                </SelectItem>
+                                <SelectItem value="chart">
+                                  Response Chart
+                                </SelectItem>
+                                <SelectItem value="compact">
+                                  Compact
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -414,6 +679,58 @@ export function StatusPageForm({
         <TabsContent value="branding">
           <Card>
             <CardContent className="pt-6 space-y-4">
+              <div className="space-y-2">
+                <Label>Theme</Label>
+                <p className="text-sm text-muted-foreground">
+                  Choose the visual style for your status page
+                </p>
+                <div className="grid grid-cols-5 gap-2 pt-1">
+                  {STATUS_THEMES.map((t) => {
+                    const meta = themeMeta[t];
+                    const selected = theme === t;
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setTheme(t)}
+                        className={`relative rounded-lg border-2 p-2 transition-all text-left ${
+                          selected
+                            ? "border-primary ring-2 ring-primary/20"
+                            : "border-border hover:border-muted-foreground/30"
+                        }`}
+                      >
+                        {/* Mini preview */}
+                        <div
+                          className="rounded-md h-14 mb-2 flex flex-col justify-end p-1.5 gap-0.5"
+                          style={{ background: meta.preview.bg }}
+                        >
+                          <div
+                            className="h-1 rounded-full w-full"
+                            style={{ background: meta.preview.accent, opacity: 0.8 }}
+                          />
+                          <div className="flex gap-[1px]">
+                            {Array.from({ length: 8 }).map((_, i) => (
+                              <div
+                                key={i}
+                                className="flex-1 h-1.5 rounded-[1px]"
+                                style={{
+                                  background: meta.preview.accent,
+                                  opacity: 0.3 + Math.random() * 0.5,
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-xs font-medium truncate">{meta.name}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">
+                          {meta.description}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="brandColor">Brand Color</Label>
                 <div className="flex items-center gap-3">
@@ -540,6 +857,75 @@ export function StatusPageForm({
                   className="w-24"
                 />
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="footer">
+          <Card>
+            <CardContent className="pt-6 space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Structured Footer</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Use a structured footer with sections instead of plain text
+                  </p>
+                </div>
+                <Switch
+                  checked={useFooterConfig}
+                  onCheckedChange={setUseFooterConfig}
+                />
+              </div>
+
+              {useFooterConfig ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Show Powered by Beacon</Label>
+                    </div>
+                    <Switch
+                      checked={footerConfig.showPoweredBy}
+                      onCheckedChange={(v) =>
+                        setFooterConfig((prev) => ({
+                          ...prev,
+                          showPoweredBy: v,
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Show RSS Link</Label>
+                    </div>
+                    <Switch
+                      checked={footerConfig.showRss}
+                      onCheckedChange={(v) =>
+                        setFooterConfig((prev) => ({
+                          ...prev,
+                          showRss: v,
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    {renderFooterSection("left", "Left")}
+                    {renderFooterSection("center", "Center")}
+                    {renderFooterSection("right", "Right")}
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="footerTextLegacy">Footer Text</Label>
+                  <Input
+                    id="footerTextLegacy"
+                    value={footerText}
+                    onChange={(e) => setFooterText(e.target.value)}
+                    placeholder="Powered by Beacon"
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
