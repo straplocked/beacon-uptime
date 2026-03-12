@@ -28,9 +28,9 @@ export function CheckHistory({ checks }: { checks: Check[] }) {
             <span
               className={`h-2 w-2 rounded-full ${
                 check.status === "up"
-                  ? "bg-emerald-500"
+                  ? "bg-teal-500"
                   : check.status === "degraded"
-                    ? "bg-yellow-500"
+                    ? "bg-amber-500"
                     : "bg-red-500"
               }`}
             />

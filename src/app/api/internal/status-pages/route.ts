@@ -28,7 +28,7 @@ const createStatusPageSchema = z.object({
   customDomain: z.string().max(255).nullable().optional(),
   logoUrl: z.string().max(500).nullable().optional(),
   faviconUrl: z.string().max(500).nullable().optional(),
-  brandColor: z.string().max(7).default("#10b981"),
+  brandColor: z.string().max(7).default("#14b8a6"),
   customCss: z.string().max(10000).nullable().optional(),
   headerText: z.string().max(500).nullable().optional(),
   footerText: z.string().max(500).nullable().optional(),

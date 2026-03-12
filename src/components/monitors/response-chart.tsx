@@ -39,8 +39,8 @@ export function ResponseChart({ data }: { data: ChartData[] }) {
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: "hsl(var(--background))",
-              border: "1px solid hsl(var(--border))",
+              backgroundColor: "var(--color-card)",
+              border: "1px solid var(--color-border)",
               borderRadius: "8px",
               fontSize: "12px",
             }}
@@ -49,8 +49,8 @@ export function ResponseChart({ data }: { data: ChartData[] }) {
           <Area
             type="monotone"
             dataKey="responseTime"
-            stroke="#10b981"
-            fill="#10b981"
+            stroke="#14b8a6"
+            fill="#14b8a6"
             fillOpacity={0.1}
             strokeWidth={2}
           />

@@ -11,7 +11,7 @@
   const pageUrl = origin + "/s/" + slug;
 
   const statusConfig = {
-    operational: { label: "All Systems Operational", bg: "#10b981", text: "#fff" },
+    operational: { label: "All Systems Operational", bg: "#14b8a6", text: "#fff" },
     degraded: { label: "Degraded Performance", bg: "#f59e0b", text: "#fff" },
     major_outage: { label: "Major Outage", bg: "#ef4444", text: "#fff" },
     unknown: { label: "Status Unknown", bg: "#6b7280", text: "#fff" },

@@ -33,16 +33,16 @@ export function UptimeBar({ dailyStats, days }: UptimeBarProps) {
     const dayKey = date.toISOString().split("T")[0];
     const stat = statsMap.get(dayKey);
 
-    let color = "bg-zinc-200"; // no data
+    let color = "bg-muted"; // no data
     let label = "No data";
 
     if (stat && stat.total > 0) {
       const upPercent = (stat.upCount / stat.total) * 100;
       if (upPercent >= 99) {
-        color = "bg-emerald-500";
+        color = "bg-teal-500";
         label = `${upPercent.toFixed(1)}% uptime`;
       } else if (upPercent >= 95) {
-        color = "bg-yellow-500";
+        color = "bg-amber-500";
         label = `${upPercent.toFixed(1)}% uptime (degraded)`;
       } else {
         color = "bg-red-500";
@@ -79,17 +79,17 @@ export function UptimeBar({ dailyStats, days }: UptimeBarProps) {
               className={`h-8 rounded-sm ${seg.color} transition-opacity hover:opacity-80 cursor-pointer`}
             />
             {hoveredDay === i && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-10 bg-zinc-900 text-white text-xs rounded-md px-3 py-2 whitespace-nowrap shadow-lg">
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-10 bg-popover text-popover-foreground text-xs rounded-md px-3 py-2 whitespace-nowrap shadow-lg border">
                 <p className="font-medium">{seg.date}</p>
-                <p className="text-zinc-300">{seg.label}</p>
+                <p className="text-muted-foreground">{seg.label}</p>
               </div>
             )}
           </div>
         ))}
       </div>
       <div className="flex justify-between mt-1.5">
-        <span className="text-xs text-zinc-400">{days} days ago</span>
-        <span className="text-xs text-zinc-400">Today</span>
+        <span className="text-xs text-muted-foreground">{days} days ago</span>
+        <span className="text-xs text-muted-foreground">Today</span>
       </div>
     </div>
   );

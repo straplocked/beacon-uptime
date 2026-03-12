@@ -19,11 +19,11 @@ export default async function MonitorsPage() {
     .orderBy(desc(monitors.createdAt));
 
   const statusColor: Record<string, string> = {
-    up: "bg-emerald-500",
+    up: "bg-teal-500 animate-pulse-dot",
     down: "bg-red-500",
-    degraded: "bg-yellow-500",
-    paused: "bg-zinc-400",
-    pending: "bg-zinc-300",
+    degraded: "bg-amber-500",
+    paused: "bg-slate-400",
+    pending: "bg-slate-300",
   };
 
   return (
@@ -67,7 +67,7 @@ export default async function MonitorsPage() {
                 <CardContent className="flex items-center justify-between py-4">
                   <div className="flex items-center gap-4">
                     <span
-                      className={`h-3 w-3 rounded-full ${statusColor[monitor.status] || "bg-zinc-300"}`}
+                      className={`h-3 w-3 rounded-full ${statusColor[monitor.status] || "bg-slate-300"}`}
                     />
                     <div>
                       <p className="font-medium">{monitor.name}</p>
@@ -82,9 +82,9 @@ export default async function MonitorsPage() {
                       variant={monitor.status === "up" ? "default" : "destructive"}
                       className={
                         monitor.status === "up"
-                          ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100"
+                          ? "bg-teal-100 text-teal-700 hover:bg-teal-100"
                           : monitor.status === "paused"
-                            ? "bg-zinc-100 text-zinc-600 hover:bg-zinc-100"
+                            ? "bg-slate-100 text-slate-600 hover:bg-slate-100"
                             : undefined
                       }
                     >

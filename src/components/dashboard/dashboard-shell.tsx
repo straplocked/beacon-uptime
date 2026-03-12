@@ -50,9 +50,9 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
   }
 
   const planColors: Record<string, string> = {
-    free: "bg-zinc-100 text-zinc-600",
-    pro: "bg-emerald-100 text-emerald-700",
-    team: "bg-blue-100 text-blue-700",
+    free: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+    pro: "bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300",
+    team: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300",
   };
 
   return (
@@ -68,7 +68,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-background border-r transform transition-transform duration-200 lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 w-64 bg-sidebar border-r transform transition-transform duration-200 lg:translate-x-0",
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -76,8 +76,8 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-6 border-b">
             <Link href="/" className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-emerald-500" />
-              <span className="font-bold text-lg">Beacon</span>
+              <Activity className="h-5 w-5 text-primary" />
+              <span className="font-extrabold text-lg uppercase tracking-wider font-display">BEACON</span>
             </Link>
             <button
               className="lg:hidden"
@@ -102,7 +102,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
                   className={cn(
                     "flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors",
                     isActive
-                      ? "bg-muted text-foreground font-medium"
+                      ? "bg-muted text-foreground font-medium border-l-2 border-primary"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                   onClick={() => setSidebarOpen(false)}
@@ -154,8 +154,8 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
             <Menu className="h-5 w-5" />
           </button>
           <div className="flex items-center gap-2 ml-4">
-            <Activity className="h-5 w-5 text-emerald-500" />
-            <span className="font-bold">Beacon</span>
+            <Activity className="h-5 w-5 text-primary" />
+            <span className="font-extrabold uppercase tracking-wider font-display">BEACON</span>
           </div>
         </header>
 

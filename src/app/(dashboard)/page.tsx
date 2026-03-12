@@ -39,15 +39,15 @@ export default async function DashboardPage() {
   const statusIcon = (status: string) => {
     switch (status) {
       case "up":
-        return <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 inline-block" />;
+        return <span className="h-2.5 w-2.5 rounded-full bg-teal-500 inline-block animate-pulse-dot" />;
       case "down":
         return <span className="h-2.5 w-2.5 rounded-full bg-red-500 inline-block" />;
       case "degraded":
-        return <span className="h-2.5 w-2.5 rounded-full bg-yellow-500 inline-block" />;
+        return <span className="h-2.5 w-2.5 rounded-full bg-amber-500 inline-block" />;
       case "paused":
-        return <span className="h-2.5 w-2.5 rounded-full bg-zinc-400 inline-block" />;
+        return <span className="h-2.5 w-2.5 rounded-full bg-slate-400 inline-block" />;
       default:
-        return <span className="h-2.5 w-2.5 rounded-full bg-zinc-300 inline-block" />;
+        return <span className="h-2.5 w-2.5 rounded-full bg-slate-300 inline-block" />;
     }
   };
 
@@ -67,7 +67,7 @@ export default async function DashboardPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Monitors Up
             </CardTitle>
-            <ArrowUp className="h-4 w-4 text-emerald-500" />
+            <ArrowUp className="h-4 w-4 text-teal-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{upCount}</div>
@@ -87,7 +87,7 @@ export default async function DashboardPage() {
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{downCount}</div>
             {degradedCount > 0 && (
-              <p className="text-xs text-yellow-600">
+              <p className="text-xs text-amber-600">
                 {degradedCount} degraded
               </p>
             )}
@@ -99,7 +99,7 @@ export default async function DashboardPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Active Incidents
             </CardTitle>
-            <AlertTriangle className="h-4 w-4 text-yellow-500" />
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -113,7 +113,7 @@ export default async function DashboardPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Paused
             </CardTitle>
-            <Clock className="h-4 w-4 text-zinc-400" />
+            <Clock className="h-4 w-4 text-slate-400" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{pausedCount}</div>

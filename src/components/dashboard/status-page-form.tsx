@@ -87,7 +87,7 @@ export function StatusPageForm({
   );
   const [isPublic, setIsPublic] = useState(initialData?.isPublic ?? true);
   const [brandColor, setBrandColor] = useState(
-    initialData?.brandColor || "#10b981"
+    initialData?.brandColor || "#14b8a6"
   );
   const [logoUrl, setLogoUrl] = useState(initialData?.logoUrl || "");
   const [faviconUrl, setFaviconUrl] = useState(
@@ -427,7 +427,7 @@ export function StatusPageForm({
                   <Input
                     value={brandColor}
                     onChange={(e) => setBrandColor(e.target.value)}
-                    placeholder="#10b981"
+                    placeholder="#14b8a6"
                     className="w-32"
                   />
                 </div>

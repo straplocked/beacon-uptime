@@ -27,7 +27,7 @@ export async function sendSlackNotification(
   }
 
   const isDown = payload.event === "monitor.down";
-  const color = isDown ? "#ef4444" : "#10b981";
+  const color = isDown ? "#ef4444" : "#14b8a6";
   const statusEmoji = isDown ? "🔴" : "🟢";
 
   const message = {

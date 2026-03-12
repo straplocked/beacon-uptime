@@ -23,17 +23,17 @@ export default async function IncidentsPage() {
     .orderBy(desc(incidents.createdAt));
 
   const impactColors: Record<string, string> = {
-    none: "bg-zinc-100 text-zinc-700",
-    minor: "bg-yellow-100 text-yellow-700",
+    none: "bg-slate-100 text-slate-700",
+    minor: "bg-amber-100 text-amber-700",
     major: "bg-orange-100 text-orange-700",
     critical: "bg-red-100 text-red-700",
   };
 
   const statusColors: Record<string, string> = {
-    investigating: "bg-yellow-100 text-yellow-700",
+    investigating: "bg-amber-100 text-amber-700",
     identified: "bg-orange-100 text-orange-700",
-    monitoring: "bg-blue-100 text-blue-700",
-    resolved: "bg-emerald-100 text-emerald-700",
+    monitoring: "bg-sky-100 text-sky-700",
+    resolved: "bg-teal-100 text-teal-700",
   };
 
   return (

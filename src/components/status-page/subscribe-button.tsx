@@ -32,7 +32,7 @@ export function SubscribeButton({ slug }: { slug: string }) {
 
   if (status === "success") {
     return (
-      <span className="text-sm text-emerald-600">
+      <span className="text-sm text-teal-600">
         Check your email to confirm!
       </span>
     );

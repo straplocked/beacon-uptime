@@ -29,11 +29,11 @@ export function ComponentRow({
   days,
 }: ComponentRowProps) {
   const statusConfig: Record<string, { label: string; color: string; icon: string }> = {
-    up: { label: "Operational", color: "text-emerald-600", icon: "bg-emerald-500" },
+    up: { label: "Operational", color: "text-teal-600", icon: "bg-teal-500" },
     down: { label: "Down", color: "text-red-600", icon: "bg-red-500" },
-    degraded: { label: "Degraded", color: "text-yellow-600", icon: "bg-yellow-500" },
-    paused: { label: "Paused", color: "text-zinc-400", icon: "bg-zinc-400" },
-    pending: { label: "Pending", color: "text-zinc-400", icon: "bg-zinc-300" },
+    degraded: { label: "Degraded", color: "text-amber-600", icon: "bg-amber-500" },
+    paused: { label: "Paused", color: "text-slate-400", icon: "bg-slate-400" },
+    pending: { label: "Pending", color: "text-slate-400", icon: "bg-slate-300" },
   };
 
   const config = statusConfig[status] || statusConfig.pending;
@@ -43,14 +43,14 @@ export function ComponentRow({
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <span className={`h-2 w-2 rounded-full ${config.icon}`} />
-          <span className="font-medium text-zinc-900 text-sm">{name}</span>
+          <span className="font-medium text-foreground text-sm">{name}</span>
         </div>
         <div className="flex items-center gap-3">
           <span className={`text-sm font-medium ${config.color}`}>
             {config.label}
           </span>
           {showUptime && uptimePercent && (
-            <span className="text-sm text-zinc-500">{uptimePercent}%</span>
+            <span className="text-sm text-muted-foreground">{uptimePercent}%</span>
           )}
         </div>
       </div>

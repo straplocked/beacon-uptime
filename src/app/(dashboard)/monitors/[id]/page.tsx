@@ -59,11 +59,11 @@ export default async function MonitorDetailPage({
       : "N/A";
 
   const statusColor: Record<string, string> = {
-    up: "bg-emerald-500",
+    up: "bg-teal-500 animate-pulse-dot",
     down: "bg-red-500",
-    degraded: "bg-yellow-500",
-    paused: "bg-zinc-400",
-    pending: "bg-zinc-300",
+    degraded: "bg-amber-500",
+    paused: "bg-slate-400",
+    pending: "bg-slate-300",
   };
 
   const chartData = recentChecks
@@ -88,7 +88,7 @@ export default async function MonitorDetailPage({
           <div>
             <div className="flex items-center gap-3">
               <span
-                className={`h-3 w-3 rounded-full ${statusColor[monitor.status] || "bg-zinc-300"}`}
+                className={`h-3 w-3 rounded-full ${statusColor[monitor.status] || "bg-slate-300"}`}
               />
               <h1 className="text-2xl font-bold">{monitor.name}</h1>
               <Badge variant="outline">{monitor.type.toUpperCase()}</Badge>

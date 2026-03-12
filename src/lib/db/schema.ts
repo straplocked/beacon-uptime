@@ -162,7 +162,7 @@ export const statusPages = pgTable(
     customDomain: text("custom_domain").unique(),
     logoUrl: text("logo_url"),
     faviconUrl: text("favicon_url"),
-    brandColor: text("brand_color").default("#10b981").notNull(),
+    brandColor: text("brand_color").default("#14b8a6").notNull(),
     customCss: text("custom_css"),
     headerText: text("header_text"),
     footerText: text("footer_text"),

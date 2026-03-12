@@ -48,12 +48,13 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted px-4 relative">
+      <div className="glow-orbs" />
+      <Card className="w-full max-w-md glow-surface relative z-10">
         <CardHeader className="text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
-            <Activity className="h-6 w-6 text-emerald-500" />
-            <span className="text-xl font-bold">Beacon</span>
+            <Activity className="h-6 w-6 text-primary" />
+            <span className="text-xl font-extrabold uppercase tracking-wider font-display">BEACON</span>
           </div>
           <CardTitle>Create your account</CardTitle>
           <CardDescription>Start monitoring your services in minutes</CardDescription>
@@ -100,7 +101,7 @@ export default function RegisterPage() {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full glow-btn" disabled={loading}>
               {loading ? "Creating account..." : "Create account"}
             </Button>
             <p className="text-sm text-muted-foreground">

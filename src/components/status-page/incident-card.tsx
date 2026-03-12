@@ -16,8 +16,8 @@ interface IncidentCardProps {
 }
 
 const impactColors: Record<string, string> = {
-  none: "border-l-zinc-300",
-  minor: "border-l-yellow-400",
+  none: "border-l-slate-300",
+  minor: "border-l-amber-400",
   major: "border-l-orange-500",
   critical: "border-l-red-500",
 };
@@ -40,14 +40,14 @@ export function IncidentCard({
   const borderColor = impactColors[impact] || impactColors.none;
 
   return (
-    <div className={`bg-white rounded-lg border border-l-4 ${borderColor} p-4`}>
+    <div className={`bg-card rounded-lg border border-l-4 ${borderColor} p-4`}>
       <div className="flex items-start justify-between mb-3">
-        <h3 className="font-medium text-zinc-900">{title}</h3>
+        <h3 className="font-medium text-foreground">{title}</h3>
         <span
           className={`text-xs font-medium px-2 py-1 rounded-full ${
             status === "resolved"
-              ? "bg-emerald-100 text-emerald-700"
-              : "bg-yellow-100 text-yellow-700"
+              ? "bg-teal-100 text-teal-700"
+              : "bg-amber-100 text-amber-700"
           }`}
         >
           {statusLabels[status] || status}
@@ -59,23 +59,23 @@ export function IncidentCard({
           {updates.map((update, i) => (
             <div key={i} className="text-sm">
               <div className="flex items-center gap-2 mb-0.5">
-                <span className="font-medium text-zinc-700">
+                <span className="font-medium text-foreground">
                   {statusLabels[update.status] || update.status}
                 </span>
-                <span className="text-zinc-400">
+                <span className="text-muted-foreground">
                   {new Date(update.createdAt).toLocaleString(undefined, {
                     hour: "numeric",
                     minute: "2-digit",
                   })}
                 </span>
               </div>
-              <p className="text-zinc-600">{update.message}</p>
+              <p className="text-muted-foreground">{update.message}</p>
             </div>
           ))}
         </div>
       )}
 
-      <div className="mt-3 text-xs text-zinc-400">
+      <div className="mt-3 text-xs text-muted-foreground">
         {new Date(createdAt).toLocaleDateString("en-US", {
           month: "long",
           day: "numeric",

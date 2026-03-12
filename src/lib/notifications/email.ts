@@ -65,7 +65,7 @@ export async function sendEmailNotification(
 }
 
 function buildEmailHtml(payload: NotificationPayload, isDown: boolean): string {
-  const statusColor = isDown ? "#ef4444" : "#10b981";
+  const statusColor = isDown ? "#ef4444" : "#14b8a6";
   const statusText = isDown ? "DOWN" : "UP";
 
   return `
