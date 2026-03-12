@@ -7,6 +7,7 @@ import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { canAddMonitor, getMinCheckInterval } from "@/lib/plans";
 import type { PlanType } from "@/lib/plans";
+import { monitorCheckQueue } from "@/lib/queue";
 
 const createMonitorSchema = z.object({
   name: z.string().min(1).max(100),
@@ -94,6 +95,15 @@ export async function POST(request: NextRequest) {
       heartbeatIntervalSeconds,
     })
     .returning();
+
+  // Enqueue immediate check (skip for heartbeat — those wait for external ping)
+  if (data.type !== "heartbeat") {
+    const jobId = `check-${monitor.id}`;
+    await monitorCheckQueue.add(jobId, { monitorId: monitor.id }, {
+      jobId,
+      deduplication: { id: jobId },
+    });
+  }
 
   return NextResponse.json({ monitor }, { status: 201 });
 }

@@ -6,6 +6,7 @@ import { eq, and } from "drizzle-orm";
 import { canUseApi } from "@/lib/plans";
 import type { PlanType } from "@/lib/plans";
 import { withRateLimit } from "@/lib/rate-limit";
+import { monitorCheckQueue } from "@/lib/queue";
 
 export async function POST(
   request: NextRequest,
@@ -39,6 +40,15 @@ export async function POST(
     .set({ isPaused: false, status: "pending", updatedAt: new Date() })
     .where(eq(monitors.id, id))
     .returning();
+
+  // Enqueue immediate check (skip heartbeat monitors)
+  if (updated.type !== "heartbeat") {
+    const jobId = `check-${updated.id}`;
+    await monitorCheckQueue.add(jobId, { monitorId: updated.id }, {
+      jobId,
+      deduplication: { id: jobId },
+    });
+  }
 
   return NextResponse.json({ monitor: updated });
 }

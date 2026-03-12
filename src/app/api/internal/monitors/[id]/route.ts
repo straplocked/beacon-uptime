@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { eq, and, desc } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
+import { monitorCheckQueue } from "@/lib/queue";
 
 const updateMonitorSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -118,6 +119,15 @@ export async function PATCH(
     .set(updateData)
     .where(eq(monitors.id, id))
     .returning();
+
+  // Enqueue immediate check when unpausing (skip heartbeat monitors)
+  if (data.isPaused === false && updated.type !== "heartbeat") {
+    const jobId = `check-${updated.id}`;
+    await monitorCheckQueue.add(jobId, { monitorId: updated.id }, {
+      jobId,
+      deduplication: { id: jobId },
+    });
+  }
 
   return NextResponse.json({ monitor: updated });
 }
