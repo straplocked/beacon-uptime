@@ -43,10 +43,8 @@ export async function POST(
 
   // Enqueue immediate check (skip heartbeat monitors)
   if (updated.type !== "heartbeat") {
-    const jobId = `check-${updated.id}`;
-    await monitorCheckQueue.add(jobId, { monitorId: updated.id }, {
-      jobId,
-      deduplication: { id: jobId },
+    await monitorCheckQueue.add(`check-${updated.id}`, { monitorId: updated.id }, {
+      deduplication: { id: `check-${updated.id}` },
     });
   }
 

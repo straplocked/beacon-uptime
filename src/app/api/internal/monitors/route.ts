@@ -98,10 +98,8 @@ export async function POST(request: NextRequest) {
 
   // Enqueue immediate check (skip for heartbeat — those wait for external ping)
   if (data.type !== "heartbeat") {
-    const jobId = `check-${monitor.id}`;
-    await monitorCheckQueue.add(jobId, { monitorId: monitor.id }, {
-      jobId,
-      deduplication: { id: jobId },
+    await monitorCheckQueue.add(`check-${monitor.id}`, { monitorId: monitor.id }, {
+      deduplication: { id: `check-${monitor.id}` },
     });
   }
 

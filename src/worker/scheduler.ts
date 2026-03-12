@@ -59,16 +59,13 @@ async function scheduleChecks() {
     console.log(`[scheduler] ${dueMonitors.length} monitor(s) due for checks`);
 
     for (const monitor of dueMonitors) {
-      // Use monitor ID as job ID to prevent duplicates
-      const jobId = `check-${monitor.id}`;
-
       await monitorCheckQueue.add(
-        jobId,
+        `check-${monitor.id}`,
         { monitorId: monitor.id },
         {
-          jobId,
-          // Prevent duplicate jobs for the same monitor
-          deduplication: { id: jobId },
+          // Prevent duplicate concurrent jobs for the same monitor.
+          // Key auto-clears when the job completes, allowing re-enqueue.
+          deduplication: { id: `check-${monitor.id}` },
         }
       );
     }
