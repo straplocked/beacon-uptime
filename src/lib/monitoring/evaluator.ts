@@ -14,6 +14,7 @@ import { eq, and, isNull, ne } from "drizzle-orm";
 import { notificationQueue } from "@/lib/queue";
 import { PLAN_LIMITS } from "@/lib/plans";
 import type { PlanType } from "@/lib/plans";
+import { edition } from "@/lib/edition";
 
 type MonitorStatus = "up" | "down" | "degraded" | "paused" | "pending";
 type CheckStatus = "up" | "down" | "degraded";
@@ -262,14 +263,16 @@ async function enqueueSubscriberNotifications(
   incidentMessage: string
 ) {
   // Check if organization's plan allows subscriber notifications
-  const [org] = await db
-    .select({ plan: organizations.plan })
-    .from(organizations)
-    .where(eq(organizations.id, organizationId))
-    .limit(1);
+  if (edition.enforcePlanLimits) {
+    const [org] = await db
+      .select({ plan: organizations.plan })
+      .from(organizations)
+      .where(eq(organizations.id, organizationId))
+      .limit(1);
 
-  if (!org || !PLAN_LIMITS[org.plan as PlanType]?.subscriberNotifications) {
-    return;
+    if (!org || !PLAN_LIMITS[org.plan as PlanType]?.subscriberNotifications) {
+      return;
+    }
   }
 
   // Get the status page for URL building

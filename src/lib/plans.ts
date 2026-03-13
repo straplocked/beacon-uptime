@@ -1,3 +1,5 @@
+import { edition } from "@/lib/edition";
+
 export type PlanType = "free" | "pro" | "team";
 
 export interface PlanLimits {
@@ -68,6 +70,7 @@ export function canAddMonitor(
   plan: PlanType,
   currentMonitorCount: number
 ): boolean {
+  if (!edition.enforcePlanLimits) return true;
   return currentMonitorCount < PLAN_LIMITS[plan].monitors;
 }
 
@@ -75,22 +78,27 @@ export function canAddStatusPage(
   plan: PlanType,
   currentPageCount: number
 ): boolean {
+  if (!edition.enforcePlanLimits) return true;
   return currentPageCount < PLAN_LIMITS[plan].statusPages;
 }
 
 export function getMinCheckInterval(plan: PlanType): number {
+  if (!edition.enforcePlanLimits) return 30;
   return PLAN_LIMITS[plan].checkIntervalSeconds;
 }
 
 export function canUseCustomDomain(plan: PlanType): boolean {
+  if (!edition.enforcePlanLimits) return true;
   return PLAN_LIMITS[plan].customDomain;
 }
 
 export function canUseCustomCss(plan: PlanType): boolean {
+  if (!edition.enforcePlanLimits) return true;
   return PLAN_LIMITS[plan].customCss;
 }
 
 export function canUseApi(plan: PlanType): boolean {
+  if (!edition.enforcePlanLimits) return true;
   return PLAN_LIMITS[plan].apiAccess;
 }
 
@@ -98,6 +106,7 @@ export function canAddNotificationChannel(
   plan: PlanType,
   currentChannelCount: number
 ): boolean {
+  if (!edition.enforcePlanLimits) return true;
   const limit = PLAN_LIMITS[plan].notificationChannels;
   if (limit === "unlimited") return true;
   return currentChannelCount < limit;
@@ -107,5 +116,6 @@ export function canAddMember(
   plan: PlanType,
   currentMemberCount: number
 ): boolean {
+  if (!edition.enforcePlanLimits) return true;
   return currentMemberCount < PLAN_LIMITS[plan].teamMembers;
 }

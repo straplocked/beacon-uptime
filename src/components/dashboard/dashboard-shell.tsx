@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { edition } from "@/lib/edition";
 
 interface DashboardShellProps {
   user: {
@@ -113,47 +114,51 @@ export function DashboardShell({ user, organization, role, children }: Dashboard
           </div>
 
           {/* Org Switcher */}
-          <div className="px-3 pt-3">
-            <button
-              onClick={() => setOrgSwitcherOpen(!orgSwitcherOpen)}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md border bg-background hover:bg-muted transition-colors"
-            >
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-              <span className="flex-1 text-left truncate font-medium">{organization.name}</span>
-              <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
-            </button>
-            {orgSwitcherOpen && (
-              <div className="mt-1 border rounded-md bg-background shadow-lg">
-                {orgs.map((org) => (
-                  <button
-                    key={org.id}
-                    onClick={() => handleSwitchOrg(org.id)}
-                    className={cn(
-                      "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors",
-                      org.id === organization.id && "bg-muted font-medium"
-                    )}
-                  >
-                    <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="flex-1 text-left truncate">{org.name}</span>
-                    <Badge
-                      variant="secondary"
-                      className={cn("text-[10px] capitalize", planColors[org.plan])}
+          {edition.showOrgSwitcher && (
+            <div className="px-3 pt-3">
+              <button
+                onClick={() => setOrgSwitcherOpen(!orgSwitcherOpen)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md border bg-background hover:bg-muted transition-colors"
+              >
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                <span className="flex-1 text-left truncate font-medium">{organization.name}</span>
+                <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+              {orgSwitcherOpen && (
+                <div className="mt-1 border rounded-md bg-background shadow-lg">
+                  {orgs.map((org) => (
+                    <button
+                      key={org.id}
+                      onClick={() => handleSwitchOrg(org.id)}
+                      className={cn(
+                        "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors",
+                        org.id === organization.id && "bg-muted font-medium"
+                      )}
                     >
-                      {org.plan}
-                    </Badge>
-                  </button>
-                ))}
-                <Link
-                  href="/settings/members"
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors border-t"
-                  onClick={() => setOrgSwitcherOpen(false)}
-                >
-                  <Users className="h-3.5 w-3.5" />
-                  Manage team
-                </Link>
-              </div>
-            )}
-          </div>
+                      <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="flex-1 text-left truncate">{org.name}</span>
+                      <Badge
+                        variant="secondary"
+                        className={cn("text-[10px] capitalize", planColors[org.plan])}
+                      >
+                        {org.plan}
+                      </Badge>
+                    </button>
+                  ))}
+                  {edition.showTeamManagement && (
+                    <Link
+                      href="/settings/members"
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors border-t"
+                      onClick={() => setOrgSwitcherOpen(false)}
+                    >
+                      <Users className="h-3.5 w-3.5" />
+                      Manage team
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Nav links */}
           <nav className="flex-1 px-3 py-4 space-y-1">
@@ -191,12 +196,14 @@ export function DashboardShell({ user, organization, role, children }: Dashboard
                   {user.email}
                 </p>
               </div>
-              <Badge
-                variant="secondary"
-                className={cn("text-xs capitalize", planColors[organization.plan])}
-              >
-                {organization.plan}
-              </Badge>
+              {edition.enforcePlanLimits && (
+                <Badge
+                  variant="secondary"
+                  className={cn("text-xs capitalize", planColors[organization.plan])}
+                >
+                  {organization.plan}
+                </Badge>
+              )}
             </div>
             <Button
               variant="ghost"

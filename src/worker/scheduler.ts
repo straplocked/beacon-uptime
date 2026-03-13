@@ -136,6 +136,8 @@ const PLAN_RETENTION_DAYS: Record<string, number> = {
   team: 90,
 };
 
+const EDITION_IS_SAAS = process.env.BEACON_EDITION === "saas";
+
 async function cleanupOldData() {
   try {
     // Get all organizations with their plan
@@ -146,7 +148,9 @@ async function cleanupOldData() {
     let totalDeleted = 0;
 
     for (const org of allOrgs) {
-      const retentionDays = PLAN_RETENTION_DAYS[org.plan] || 7;
+      const retentionDays = EDITION_IS_SAAS
+        ? (PLAN_RETENTION_DAYS[org.plan] || 7)
+        : parseInt(process.env.DATA_RETENTION_DAYS || "365", 10);
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - retentionDays);
 
