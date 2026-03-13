@@ -37,8 +37,8 @@ vi.mock("@/lib/db/schema", () => ({
     confirmed: "subscribers.confirmed",
     unsubscribedAt: "subscribers.unsubscribedAt",
   },
-  users: { id: "users.id", plan: "users.plan" },
-  notificationChannels: { userId: "notificationChannels.userId" },
+  organizations: { id: "organizations.id", plan: "organizations.plan" },
+  notificationChannels: { organizationId: "notificationChannels.organizationId" },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -67,7 +67,7 @@ import { processCheckResult } from "./evaluator";
 
 const baseMonitor = {
   id: "mon-1",
-  userId: "user-1",
+  organizationId: "org-1",
   name: "Test Monitor",
   target: "https://example.com",
   type: "http",

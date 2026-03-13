@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { monitors, checkResults } from "@/lib/db/schema";
-import { getCurrentUser } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 import { eq, and, desc } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { monitorCheckQueue } from "@/lib/queue";
+import { canEditResources } from "@/lib/auth/permissions";
 
 const updateMonitorSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -22,8 +23,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const ctx = await getAuthContext();
+  if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -32,7 +33,7 @@ export async function GET(
   const [monitor] = await db
     .select()
     .from(monitors)
-    .where(and(eq(monitors.id, id), eq(monitors.userId, user.id)))
+    .where(and(eq(monitors.id, id), eq(monitors.organizationId, ctx.organization.id)))
     .limit(1);
 
   if (!monitor) {
@@ -69,9 +70,13 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const ctx = await getAuthContext();
+  if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!canEditResources(ctx.role)) {
+    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
   }
 
   const { id } = await params;
@@ -80,7 +85,7 @@ export async function PATCH(
   const [existing] = await db
     .select()
     .from(monitors)
-    .where(and(eq(monitors.id, id), eq(monitors.userId, user.id)))
+    .where(and(eq(monitors.id, id), eq(monitors.organizationId, ctx.organization.id)))
     .limit(1);
 
   if (!existing) {
@@ -132,9 +137,13 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const ctx = await getAuthContext();
+  if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!canEditResources(ctx.role)) {
+    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
   }
 
   const { id } = await params;
@@ -142,7 +151,7 @@ export async function DELETE(
   const [existing] = await db
     .select()
     .from(monitors)
-    .where(and(eq(monitors.id, id), eq(monitors.userId, user.id)))
+    .where(and(eq(monitors.id, id), eq(monitors.organizationId, ctx.organization.id)))
     .limit(1);
 
   if (!existing) {

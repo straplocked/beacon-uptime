@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
-import { hashPassword, createSession, getSessionCookieName, getSessionDurationMs } from "@/lib/auth";
+import { users, organizations, organizationMembers } from "@/lib/db/schema";
+import { hashPassword, createSession, getSessionCookieName, getOrgCookieName, getSessionDurationMs } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -47,25 +47,45 @@ export async function POST(request: NextRequest) {
         email: email.toLowerCase(),
         passwordHash,
         name,
+      })
+      .returning();
+
+    // Create personal organization
+    const orgSlug = email.toLowerCase().replace("@", "-at-");
+    const [org] = await db
+      .insert(organizations)
+      .values({
+        name: `${name}'s Organization`,
+        slug: orgSlug,
         plan: "free",
       })
       .returning();
+
+    // Create owner membership
+    await db.insert(organizationMembers).values({
+      organizationId: org.id,
+      userId: user.id,
+      role: "owner",
+    });
 
     // Create session
     const sessionId = await createSession(user.id);
 
     const response = NextResponse.json(
-      { user: { id: user.id, email: user.email, name: user.name, plan: user.plan } },
+      { user: { id: user.id, email: user.email, name: user.name }, organization: { id: org.id, plan: org.plan } },
       { status: 201 }
     );
 
-    response.cookies.set(getSessionCookieName(), sessionId, {
+    const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      sameSite: "lax" as const,
       path: "/",
       maxAge: getSessionDurationMs() / 1000,
-    });
+    };
+
+    response.cookies.set(getSessionCookieName(), sessionId, cookieOptions);
+    response.cookies.set(getOrgCookieName(), org.id, cookieOptions);
 
     return response;
   } catch (error) {

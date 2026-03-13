@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { monitors, checkResults, incidents } from "@/lib/db/schema";
-import { getCurrentUser } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 import { eq, and, desc, sql, isNull, ne, count } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,14 +8,14 @@ import { Activity, ArrowUp, ArrowDown, Clock, AlertTriangle } from "lucide-react
 import Link from "next/link";
 
 export default async function DashboardPage() {
-  const user = await getCurrentUser();
-  if (!user) return null;
+  const ctx = await getAuthContext();
+  if (!ctx) return null;
 
   // Fetch monitors
   const userMonitors = await db
     .select()
     .from(monitors)
-    .where(eq(monitors.userId, user.id))
+    .where(eq(monitors.organizationId, ctx.organization.id))
     .orderBy(desc(monitors.createdAt));
 
   // Count by status
@@ -30,7 +30,7 @@ export default async function DashboardPage() {
     .from(incidents)
     .where(
       and(
-        eq(incidents.userId, user.id),
+        eq(incidents.organizationId, ctx.organization.id),
         isNull(incidents.resolvedAt),
         ne(incidents.status, "resolved")
       )

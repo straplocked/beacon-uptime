@@ -1,14 +1,22 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
+import { canManageBilling } from "@/lib/auth/permissions";
 import { createCustomerPortalSession } from "@/lib/stripe";
 
 export async function POST() {
-  const user = await getCurrentUser();
-  if (!user) {
+  const ctx = await getAuthContext();
+  if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!user.stripeCustomerId) {
+  if (!canManageBilling(ctx.role)) {
+    return NextResponse.json(
+      { error: "Only the organization owner can manage billing" },
+      { status: 403 }
+    );
+  }
+
+  if (!ctx.organization.stripeCustomerId) {
     return NextResponse.json(
       { error: "No billing account found" },
       { status: 400 }
@@ -19,7 +27,7 @@ export async function POST() {
 
   try {
     const session = await createCustomerPortalSession(
-      user.stripeCustomerId,
+      ctx.organization.stripeCustomerId,
       baseUrl
     );
 

@@ -5,11 +5,12 @@ import {
   statusPageMonitors,
   monitors,
 } from "@/lib/db/schema";
-import { getCurrentUser } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { canUseCustomDomain, canUseCustomCss } from "@/lib/plans";
 import type { PlanType } from "@/lib/plans";
+import { canEditResources } from "@/lib/auth/permissions";
 
 const footerItemSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("text"), content: z.string().max(500) }),
@@ -67,8 +68,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const ctx = await getAuthContext();
+  if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -77,7 +78,7 @@ export async function GET(
   const [page] = await db
     .select()
     .from(statusPages)
-    .where(and(eq(statusPages.id, id), eq(statusPages.userId, user.id)))
+    .where(and(eq(statusPages.id, id), eq(statusPages.organizationId, ctx.organization.id)))
     .limit(1);
 
   if (!page) {
@@ -111,18 +112,22 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const ctx = await getAuthContext();
+  if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (!canEditResources(ctx.role)) {
+    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+  }
+
   const { id } = await params;
-  const plan = user.plan as PlanType;
+  const plan = ctx.organization.plan as PlanType;
 
   const [existing] = await db
     .select()
     .from(statusPages)
-    .where(and(eq(statusPages.id, id), eq(statusPages.userId, user.id)))
+    .where(and(eq(statusPages.id, id), eq(statusPages.organizationId, ctx.organization.id)))
     .limit(1);
 
   if (!existing) {
@@ -158,17 +163,17 @@ export async function PATCH(
     );
   }
 
-  // Verify monitors belong to user if provided
+  // Verify monitors belong to org if provided
   if (data.monitors && data.monitors.length > 0) {
     const monitorIds = data.monitors.map((m) => m.monitorId);
-    const userMonitors = await db
+    const orgMonitors = await db
       .select({ id: monitors.id })
       .from(monitors)
-      .where(eq(monitors.userId, user.id));
-    const userMonitorIds = new Set(userMonitors.map((m) => m.id));
+      .where(eq(monitors.organizationId, ctx.organization.id));
+    const orgMonitorIds = new Set(orgMonitors.map((m) => m.id));
 
     for (const mid of monitorIds) {
-      if (!userMonitorIds.has(mid)) {
+      if (!orgMonitorIds.has(mid)) {
         return NextResponse.json(
           { error: `Monitor ${mid} not found` },
           { status: 400 }
@@ -237,9 +242,13 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const ctx = await getAuthContext();
+  if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!canEditResources(ctx.role)) {
+    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
   }
 
   const { id } = await params;
@@ -247,7 +256,7 @@ export async function DELETE(
   const [existing] = await db
     .select()
     .from(statusPages)
-    .where(and(eq(statusPages.id, id), eq(statusPages.userId, user.id)))
+    .where(and(eq(statusPages.id, id), eq(statusPages.organizationId, ctx.organization.id)))
     .limit(1);
 
   if (!existing) {

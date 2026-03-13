@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { monitors } from "@/lib/db/schema";
-import { getApiKeyUser } from "@/lib/auth/api-key";
+import { getApiKeyOrg } from "@/lib/auth/api-key";
 import { eq, desc, count } from "drizzle-orm";
 import { z } from "zod";
 import { canUseApi, canAddMonitor, getMinCheckInterval } from "@/lib/plans";
@@ -21,36 +21,36 @@ const createMonitorSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const user = await getApiKeyUser(request);
-  if (!user) {
+  const org = await getApiKeyOrg(request);
+  if (!org) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!canUseApi(user.plan as PlanType)) {
+  if (!canUseApi(org.plan as PlanType)) {
     return NextResponse.json({ error: "API access not available on your plan" }, { status: 403 });
   }
 
-  const rateLimited = await withRateLimit(request, `api:${user.id}`, 60, 60);
+  const rateLimited = await withRateLimit(request, `api:${org.id}`, 60, 60);
   if (rateLimited) return rateLimited;
 
-  const userMonitors = await db
+  const orgMonitors = await db
     .select()
     .from(monitors)
-    .where(eq(monitors.userId, user.id))
+    .where(eq(monitors.organizationId, org.id))
     .orderBy(desc(monitors.createdAt));
 
-  return NextResponse.json({ monitors: userMonitors });
+  return NextResponse.json({ monitors: orgMonitors });
 }
 
 export async function POST(request: NextRequest) {
-  const user = await getApiKeyUser(request);
-  if (!user) {
+  const org = await getApiKeyOrg(request);
+  if (!org) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!canUseApi(user.plan as PlanType)) {
+  if (!canUseApi(org.plan as PlanType)) {
     return NextResponse.json({ error: "API access not available on your plan" }, { status: 403 });
   }
 
-  const rateLimited = await withRateLimit(request, `api:${user.id}`, 60, 60);
+  const rateLimited = await withRateLimit(request, `api:${org.id}`, 60, 60);
   if (rateLimited) return rateLimited;
 
   const body = await request.json();
@@ -63,11 +63,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const plan = user.plan as PlanType;
+  const plan = org.plan as PlanType;
   const [monitorCount] = await db
     .select({ count: count() })
     .from(monitors)
-    .where(eq(monitors.userId, user.id));
+    .where(eq(monitors.organizationId, org.id));
 
   if (!canAddMonitor(plan, monitorCount.count)) {
     return NextResponse.json(
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
   const [monitor] = await db
     .insert(monitors)
     .values({
-      userId: user.id,
+      organizationId: org.id,
       name: data.name,
       type: data.type,
       target: data.target,

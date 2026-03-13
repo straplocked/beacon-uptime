@@ -1,21 +1,27 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 
 export async function GET() {
   try {
-    const user = await getCurrentUser();
+    const ctx = await getAuthContext();
 
-    if (!user) {
+    if (!ctx) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     return NextResponse.json({
       user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        plan: user.plan,
+        id: ctx.user.id,
+        email: ctx.user.email,
+        name: ctx.user.name,
       },
+      organization: {
+        id: ctx.organization.id,
+        name: ctx.organization.name,
+        slug: ctx.organization.slug,
+        plan: ctx.organization.plan,
+      },
+      role: ctx.role,
     });
   } catch (error) {
     console.error("[auth/me] Error:", error);

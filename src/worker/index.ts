@@ -116,7 +116,7 @@ const checkWorker = new Worker(
     await processCheckResult(
       {
         id: mon.id,
-        userId: mon.userId,
+        organizationId: mon.organizationId,
         name: mon.name,
         target: mon.target,
         type: mon.type,

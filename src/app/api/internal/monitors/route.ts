@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { monitors, checkResults } from "@/lib/db/schema";
-import { getCurrentUser } from "@/lib/auth";
-import { eq, desc, and, count } from "drizzle-orm";
-import { sql } from "drizzle-orm";
+import { monitors } from "@/lib/db/schema";
+import { getAuthContext } from "@/lib/auth";
+import { eq, desc, count } from "drizzle-orm";
 import { z } from "zod";
 import { canAddMonitor, getMinCheckInterval } from "@/lib/plans";
 import type { PlanType } from "@/lib/plans";
 import { monitorCheckQueue } from "@/lib/queue";
+import { canEditResources } from "@/lib/auth/permissions";
 
 const createMonitorSchema = z.object({
   name: z.string().min(1).max(100),
@@ -22,24 +22,28 @@ const createMonitorSchema = z.object({
 });
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) {
+  const ctx = await getAuthContext();
+  if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const userMonitors = await db
+  const orgMonitors = await db
     .select()
     .from(monitors)
-    .where(eq(monitors.userId, user.id))
+    .where(eq(monitors.organizationId, ctx.organization.id))
     .orderBy(desc(monitors.createdAt));
 
-  return NextResponse.json({ monitors: userMonitors });
+  return NextResponse.json({ monitors: orgMonitors });
 }
 
 export async function POST(request: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const ctx = await getAuthContext();
+  if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!canEditResources(ctx.role)) {
+    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
   }
 
   const body = await request.json();
@@ -53,12 +57,13 @@ export async function POST(request: NextRequest) {
   }
 
   // Check plan limits
+  const plan = ctx.organization.plan as PlanType;
   const [monitorCount] = await db
     .select({ count: count() })
     .from(monitors)
-    .where(eq(monitors.userId, user.id));
+    .where(eq(monitors.organizationId, ctx.organization.id));
 
-  if (!canAddMonitor(user.plan as PlanType, monitorCount.count)) {
+  if (!canAddMonitor(plan, monitorCount.count)) {
     return NextResponse.json(
       { error: "Monitor limit reached for your plan" },
       { status: 403 }
@@ -66,7 +71,7 @@ export async function POST(request: NextRequest) {
   }
 
   const data = parsed.data;
-  const minInterval = getMinCheckInterval(user.plan as PlanType);
+  const minInterval = getMinCheckInterval(plan);
   const intervalSeconds = Math.max(data.intervalSeconds || 60, minInterval);
 
   // Generate heartbeat token if needed
@@ -80,7 +85,8 @@ export async function POST(request: NextRequest) {
   const [monitor] = await db
     .insert(monitors)
     .values({
-      userId: user.id,
+      organizationId: ctx.organization.id,
+      createdByUserId: ctx.user.id,
       name: data.name,
       type: data.type,
       target: data.target,

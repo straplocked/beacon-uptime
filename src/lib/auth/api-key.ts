@@ -1,22 +1,22 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { organizations } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
-export async function getApiKeyUser(request: NextRequest) {
+export async function getApiKeyOrg(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   if (!authHeader?.startsWith("Bearer ")) return null;
 
   const apiKey = authHeader.slice(7);
   if (!apiKey) return null;
 
-  const [user] = await db
+  const [org] = await db
     .select()
-    .from(users)
-    .where(eq(users.apiKey, apiKey))
+    .from(organizations)
+    .where(eq(organizations.apiKey, apiKey))
     .limit(1);
 
-  return user ?? null;
+  return org ?? null;
 }
 
 export function generateApiKey(): string {

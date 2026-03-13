@@ -1,10 +1,12 @@
 import { db } from "@/lib/db";
-import { users, sessions } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { users, sessions, organizations, organizationMembers } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 import { sha256 } from "./crypto";
 import { cookies } from "next/headers";
+import type { MemberRole } from "./permissions";
 
 const SESSION_COOKIE_NAME = "beacon_session";
+const ORG_COOKIE_NAME = "beacon_org";
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 // ─── Password Hashing ───────────────────────────────────────────
@@ -145,6 +147,76 @@ export function getSessionCookieName() {
   return SESSION_COOKIE_NAME;
 }
 
+export function getOrgCookieName() {
+  return ORG_COOKIE_NAME;
+}
+
 export function getSessionDurationMs() {
   return SESSION_DURATION_MS;
+}
+
+// ─── Organization Auth Context ─────────────────────────────────
+
+export interface AuthContext {
+  user: typeof users.$inferSelect;
+  organization: typeof organizations.$inferSelect;
+  membership: typeof organizationMembers.$inferSelect;
+  role: MemberRole;
+}
+
+/**
+ * Returns the authenticated user + their active organization + membership.
+ * Active org is determined by the beacon_org cookie, defaulting to first org.
+ */
+export async function getAuthContext(): Promise<AuthContext | null> {
+  const user = await getCurrentUser();
+  if (!user) return null;
+
+  const cookieStore = await cookies();
+  const orgCookie = cookieStore.get(ORG_COOKIE_NAME);
+  const requestedOrgId = orgCookie?.value;
+
+  let membership;
+
+  if (requestedOrgId) {
+    // Try to find membership for the requested org
+    const [found] = await db
+      .select()
+      .from(organizationMembers)
+      .where(
+        and(
+          eq(organizationMembers.userId, user.id),
+          eq(organizationMembers.organizationId, requestedOrgId)
+        )
+      )
+      .limit(1);
+    membership = found;
+  }
+
+  if (!membership) {
+    // Fall back to user's first org
+    const [found] = await db
+      .select()
+      .from(organizationMembers)
+      .where(eq(organizationMembers.userId, user.id))
+      .limit(1);
+    membership = found;
+  }
+
+  if (!membership) return null;
+
+  const [org] = await db
+    .select()
+    .from(organizations)
+    .where(eq(organizations.id, membership.organizationId))
+    .limit(1);
+
+  if (!org) return null;
+
+  return {
+    user,
+    organization: org,
+    membership,
+    role: membership.role as MemberRole,
+  };
 }

@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { incidents, incidentUpdates, statusPages } from "@/lib/db/schema";
-import { getCurrentUser } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 import { eq, and, asc } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -29,8 +29,8 @@ export default async function IncidentDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const user = await getCurrentUser();
-  if (!user) return null;
+  const ctx = await getAuthContext();
+  if (!ctx) return null;
 
   const { id } = await params;
 
@@ -42,7 +42,7 @@ export default async function IncidentDetailPage({
     })
     .from(incidents)
     .innerJoin(statusPages, eq(incidents.statusPageId, statusPages.id))
-    .where(and(eq(incidents.id, id), eq(incidents.userId, user.id)))
+    .where(and(eq(incidents.id, id), eq(incidents.organizationId, ctx.organization.id)))
     .limit(1);
 
   if (!result) notFound();

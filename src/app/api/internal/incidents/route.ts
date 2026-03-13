@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { incidents, incidentUpdates, statusPages } from "@/lib/db/schema";
-import { getCurrentUser } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod";
+import { canEditResources } from "@/lib/auth/permissions";
 
 const createIncidentSchema = z.object({
   statusPageId: z.string().uuid(),
@@ -14,12 +15,12 @@ const createIncidentSchema = z.object({
 });
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) {
+  const ctx = await getAuthContext();
+  if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const userIncidents = await db
+  const orgIncidents = await db
     .select({
       incident: incidents,
       statusPageName: statusPages.name,
@@ -27,16 +28,20 @@ export async function GET() {
     })
     .from(incidents)
     .innerJoin(statusPages, eq(incidents.statusPageId, statusPages.id))
-    .where(eq(incidents.userId, user.id))
+    .where(eq(incidents.organizationId, ctx.organization.id))
     .orderBy(desc(incidents.createdAt));
 
-  return NextResponse.json({ incidents: userIncidents });
+  return NextResponse.json({ incidents: orgIncidents });
 }
 
 export async function POST(request: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const ctx = await getAuthContext();
+  if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!canEditResources(ctx.role)) {
+    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
   }
 
   const body = await request.json();
@@ -51,14 +56,14 @@ export async function POST(request: NextRequest) {
 
   const data = parsed.data;
 
-  // Verify status page belongs to user
+  // Verify status page belongs to org
   const [page] = await db
     .select()
     .from(statusPages)
     .where(
       and(
         eq(statusPages.id, data.statusPageId),
-        eq(statusPages.userId, user.id)
+        eq(statusPages.organizationId, ctx.organization.id)
       )
     )
     .limit(1);
@@ -74,7 +79,8 @@ export async function POST(request: NextRequest) {
     const [incident] = await tx
       .insert(incidents)
       .values({
-        userId: user.id,
+        organizationId: ctx.organization.id,
+        createdByUserId: ctx.user.id,
         statusPageId: data.statusPageId,
         title: data.title,
         status: data.status,

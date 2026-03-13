@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { statusPages, statusPageMonitors, monitors } from "@/lib/db/schema";
-import { getCurrentUser } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 import { eq, desc, count } from "drizzle-orm";
 import { z } from "zod";
 import {
@@ -10,6 +10,7 @@ import {
   canUseCustomCss,
 } from "@/lib/plans";
 import type { PlanType } from "@/lib/plans";
+import { canEditResources } from "@/lib/auth/permissions";
 
 const footerItemSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("text"), content: z.string().max(500) }),
@@ -63,24 +64,28 @@ const createStatusPageSchema = z.object({
 });
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) {
+  const ctx = await getAuthContext();
+  if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const pages = await db
     .select()
     .from(statusPages)
-    .where(eq(statusPages.userId, user.id))
+    .where(eq(statusPages.organizationId, ctx.organization.id))
     .orderBy(desc(statusPages.createdAt));
 
   return NextResponse.json({ statusPages: pages });
 }
 
 export async function POST(request: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const ctx = await getAuthContext();
+  if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!canEditResources(ctx.role)) {
+    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
   }
 
   const body = await request.json();
@@ -93,14 +98,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const plan = user.plan as PlanType;
+  const plan = ctx.organization.plan as PlanType;
   const data = parsed.data;
 
   // Check plan limits
   const [pageCount] = await db
     .select({ count: count() })
     .from(statusPages)
-    .where(eq(statusPages.userId, user.id));
+    .where(eq(statusPages.organizationId, ctx.organization.id));
 
   if (!canAddStatusPage(plan, pageCount.count)) {
     return NextResponse.json(
@@ -123,17 +128,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Verify all monitors belong to the user
+  // Verify all monitors belong to the org
   if (data.monitors.length > 0) {
     const monitorIds = data.monitors.map((m) => m.monitorId);
-    const userMonitors = await db
+    const orgMonitors = await db
       .select({ id: monitors.id })
       .from(monitors)
-      .where(eq(monitors.userId, user.id));
-    const userMonitorIds = new Set(userMonitors.map((m) => m.id));
+      .where(eq(monitors.organizationId, ctx.organization.id));
+    const orgMonitorIds = new Set(orgMonitors.map((m) => m.id));
 
     for (const id of monitorIds) {
-      if (!userMonitorIds.has(id)) {
+      if (!orgMonitorIds.has(id)) {
         return NextResponse.json(
           { error: `Monitor ${id} not found` },
           { status: 400 }
@@ -146,7 +151,8 @@ export async function POST(request: NextRequest) {
     const [page] = await tx
       .insert(statusPages)
       .values({
-        userId: user.id,
+        organizationId: ctx.organization.id,
+        createdByUserId: ctx.user.id,
         name: data.name,
         slug: data.slug,
         customDomain: data.customDomain || null,

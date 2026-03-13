@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { stripe, STRIPE_PRICES } from "@/lib/stripe";
+import { getStripe, STRIPE_PRICES } from "@/lib/stripe";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { organizations } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import type { PlanType } from "@/lib/plans";
 
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
 
   let event;
   try {
-    event = stripe.webhooks.constructEvent(
+    event = getStripe().webhooks.constructEvent(
       body,
       sig,
       process.env.STRIPE_WEBHOOK_SECRET!
@@ -35,26 +35,26 @@ export async function POST(request: NextRequest) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object;
-        const userId = session.metadata?.userId;
+        const organizationId = session.metadata?.organizationId;
         const plan = session.metadata?.plan as PlanType | undefined;
 
-        if (!userId || !plan) {
+        if (!organizationId || !plan) {
           console.error("[stripe webhook] Missing metadata on checkout session");
           break;
         }
 
         await db
-          .update(users)
+          .update(organizations)
           .set({
             plan,
             stripeCustomerId: session.customer as string,
             stripeSubscriptionId: session.subscription as string,
             updatedAt: new Date(),
           })
-          .where(eq(users.id, userId));
+          .where(eq(organizations.id, organizationId));
 
         console.log(
-          `[stripe webhook] User ${userId} upgraded to ${plan}`
+          `[stripe webhook] Organization ${organizationId} upgraded to ${plan}`
         );
         break;
       }
@@ -68,20 +68,20 @@ export async function POST(request: NextRequest) {
         const plan = priceToPlan(priceId);
         if (!plan) break;
 
-        const [user] = await db
+        const [org] = await db
           .select()
-          .from(users)
-          .where(eq(users.stripeSubscriptionId, subscription.id))
+          .from(organizations)
+          .where(eq(organizations.stripeSubscriptionId, subscription.id))
           .limit(1);
 
-        if (user) {
+        if (org) {
           await db
-            .update(users)
+            .update(organizations)
             .set({ plan, updatedAt: new Date() })
-            .where(eq(users.id, user.id));
+            .where(eq(organizations.id, org.id));
 
           console.log(
-            `[stripe webhook] User ${user.id} plan changed to ${plan}`
+            `[stripe webhook] Organization ${org.id} plan changed to ${plan}`
           );
         }
         break;
@@ -90,24 +90,24 @@ export async function POST(request: NextRequest) {
       case "customer.subscription.deleted": {
         const subscription = event.data.object;
 
-        const [user] = await db
+        const [org] = await db
           .select()
-          .from(users)
-          .where(eq(users.stripeSubscriptionId, subscription.id))
+          .from(organizations)
+          .where(eq(organizations.stripeSubscriptionId, subscription.id))
           .limit(1);
 
-        if (user) {
+        if (org) {
           await db
-            .update(users)
+            .update(organizations)
             .set({
               plan: "free",
               stripeSubscriptionId: null,
               updatedAt: new Date(),
             })
-            .where(eq(users.id, user.id));
+            .where(eq(organizations.id, org.id));
 
           console.log(
-            `[stripe webhook] User ${user.id} reverted to free plan`
+            `[stripe webhook] Organization ${org.id} reverted to free plan`
           );
         }
         break;

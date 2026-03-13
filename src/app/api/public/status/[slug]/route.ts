@@ -4,9 +4,9 @@ import {
   statusPages,
   statusPageMonitors,
   monitors,
-  users,
+  organizations,
 } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { PLAN_LIMITS } from "@/lib/plans";
 import type { PlanType } from "@/lib/plans";
 import { withRateLimit, getClientIp } from "@/lib/rate-limit";
@@ -27,7 +27,7 @@ export async function GET(
       name: statusPages.name,
       slug: statusPages.slug,
       isPublic: statusPages.isPublic,
-      userId: statusPages.userId,
+      organizationId: statusPages.organizationId,
     })
     .from(statusPages)
     .where(eq(statusPages.slug, slug))
@@ -38,13 +38,13 @@ export async function GET(
   }
 
   // Check plan allows widget
-  const [owner] = await db
-    .select({ plan: users.plan })
-    .from(users)
-    .where(eq(users.id, page.userId))
+  const [org] = await db
+    .select({ plan: organizations.plan })
+    .from(organizations)
+    .where(eq(organizations.id, page.organizationId))
     .limit(1);
 
-  if (!owner || !PLAN_LIMITS[owner.plan as PlanType]?.floatingWidget) {
+  if (!org || !PLAN_LIMITS[org.plan as PlanType]?.floatingWidget) {
     return NextResponse.json(
       { error: "Widget not available on this plan" },
       { status: 403 }

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { notificationChannels } from "@/lib/db/schema";
-import { getCurrentUser } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 import { eq, count } from "drizzle-orm";
 import { z } from "zod";
 import { canAddNotificationChannel } from "@/lib/plans";
 import type { PlanType } from "@/lib/plans";
+import { canEditResources } from "@/lib/auth/permissions";
 
 const createChannelSchema = z.object({
   type: z.enum(["email", "slack", "discord", "webhook"]),
@@ -14,9 +15,13 @@ const createChannelSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const ctx = await getAuthContext();
+  if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!canEditResources(ctx.role)) {
+    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
   }
 
   const body = await request.json();
@@ -33,9 +38,9 @@ export async function POST(request: NextRequest) {
   const [channelCount] = await db
     .select({ count: count() })
     .from(notificationChannels)
-    .where(eq(notificationChannels.userId, user.id));
+    .where(eq(notificationChannels.organizationId, ctx.organization.id));
 
-  if (!canAddNotificationChannel(user.plan as PlanType, channelCount.count)) {
+  if (!canAddNotificationChannel(ctx.organization.plan as PlanType, channelCount.count)) {
     return NextResponse.json(
       { error: "Notification channel limit reached for your plan" },
       { status: 403 }
@@ -47,7 +52,8 @@ export async function POST(request: NextRequest) {
   const [channel] = await db
     .insert(notificationChannels)
     .values({
-      userId: user.id,
+      organizationId: ctx.organization.id,
+      createdByUserId: ctx.user.id,
       type,
       name,
       config,

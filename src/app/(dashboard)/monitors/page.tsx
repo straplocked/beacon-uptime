@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { monitors } from "@/lib/db/schema";
-import { getCurrentUser } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 import { eq, desc } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,13 +9,13 @@ import { Plus, Activity } from "lucide-react";
 import Link from "next/link";
 
 export default async function MonitorsPage() {
-  const user = await getCurrentUser();
-  if (!user) return null;
+  const ctx = await getAuthContext();
+  if (!ctx) return null;
 
   const userMonitors = await db
     .select()
     .from(monitors)
-    .where(eq(monitors.userId, user.id))
+    .where(eq(monitors.organizationId, ctx.organization.id))
     .orderBy(desc(monitors.createdAt));
 
   const statusColor: Record<string, string> = {

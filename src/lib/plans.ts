@@ -102,3 +102,10 @@ export function canAddNotificationChannel(
   if (limit === "unlimited") return true;
   return currentChannelCount < limit;
 }
+
+export function canAddMember(
+  plan: PlanType,
+  currentMemberCount: number
+): boolean {
+  return currentMemberCount < PLAN_LIMITS[plan].teamMembers;
+}

@@ -13,10 +13,13 @@ import {
   LogOut,
   Menu,
   X,
+  Building2,
+  Users,
+  ChevronsUpDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
 interface DashboardShellProps {
@@ -24,8 +27,13 @@ interface DashboardShellProps {
     id: string;
     name: string;
     email: string;
+  };
+  organization: {
+    id: string;
+    name: string;
     plan: string;
   };
+  role: string;
   children: React.ReactNode;
 }
 
@@ -38,14 +46,31 @@ const navigation = [
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
-export function DashboardShell({ user, children }: DashboardShellProps) {
+export function DashboardShell({ user, organization, role, children }: DashboardShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [orgSwitcherOpen, setOrgSwitcherOpen] = useState(false);
+  const [orgs, setOrgs] = useState<Array<{ id: string; name: string; plan: string; role: string }>>([]);
+
+  useEffect(() => {
+    if (orgSwitcherOpen && orgs.length === 0) {
+      fetch("/api/internal/organizations")
+        .then((r) => r.json())
+        .then((data) => setOrgs(data.organizations || []))
+        .catch(() => {});
+    }
+  }, [orgSwitcherOpen, orgs.length]);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
+    router.refresh();
+  }
+
+  async function handleSwitchOrg(orgId: string) {
+    await fetch(`/api/internal/organizations/${orgId}/switch`, { method: "POST" });
+    setOrgSwitcherOpen(false);
     router.refresh();
   }
 
@@ -87,6 +112,49 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
             </button>
           </div>
 
+          {/* Org Switcher */}
+          <div className="px-3 pt-3">
+            <button
+              onClick={() => setOrgSwitcherOpen(!orgSwitcherOpen)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md border bg-background hover:bg-muted transition-colors"
+            >
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+              <span className="flex-1 text-left truncate font-medium">{organization.name}</span>
+              <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+            {orgSwitcherOpen && (
+              <div className="mt-1 border rounded-md bg-background shadow-lg">
+                {orgs.map((org) => (
+                  <button
+                    key={org.id}
+                    onClick={() => handleSwitchOrg(org.id)}
+                    className={cn(
+                      "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors",
+                      org.id === organization.id && "bg-muted font-medium"
+                    )}
+                  >
+                    <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="flex-1 text-left truncate">{org.name}</span>
+                    <Badge
+                      variant="secondary"
+                      className={cn("text-[10px] capitalize", planColors[org.plan])}
+                    >
+                      {org.plan}
+                    </Badge>
+                  </button>
+                ))}
+                <Link
+                  href="/settings/members"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors border-t"
+                  onClick={() => setOrgSwitcherOpen(false)}
+                >
+                  <Users className="h-3.5 w-3.5" />
+                  Manage team
+                </Link>
+              </div>
+            )}
+          </div>
+
           {/* Nav links */}
           <nav className="flex-1 px-3 py-4 space-y-1">
             {navigation.map((item) => {
@@ -125,9 +193,9 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
               </div>
               <Badge
                 variant="secondary"
-                className={cn("text-xs capitalize", planColors[user.plan])}
+                className={cn("text-xs capitalize", planColors[organization.plan])}
               >
-                {user.plan}
+                {organization.plan}
               </Badge>
             </div>
             <Button

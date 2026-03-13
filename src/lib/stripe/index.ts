@@ -1,8 +1,15 @@
 import Stripe from "stripe";
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2026-02-25.clover",
-});
+let _stripe: Stripe | null = null;
+
+export function getStripe(): Stripe {
+  if (!_stripe) {
+    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+      apiVersion: "2026-02-25.clover",
+    });
+  }
+  return _stripe;
+}
 
 export const STRIPE_PRICES = {
   pro: process.env.STRIPE_PRO_PRICE_ID!,
@@ -10,14 +17,15 @@ export const STRIPE_PRICES = {
 };
 
 export async function createCheckoutSession(
-  userId: string,
+  organizationId: string,
   userEmail: string,
   plan: "pro" | "team",
-  baseUrl: string
+  baseUrl: string,
+  customerId?: string
 ) {
-  const session = await stripe.checkout.sessions.create({
+  const session = await getStripe().checkout.sessions.create({
     mode: "subscription",
-    customer_email: userEmail,
+    ...(customerId ? { customer: customerId } : { customer_email: userEmail }),
     line_items: [
       {
         price: STRIPE_PRICES[plan],
@@ -25,7 +33,7 @@ export async function createCheckoutSession(
       },
     ],
     metadata: {
-      userId,
+      organizationId,
       plan,
     },
     success_url: `${baseUrl}/settings/billing?success=true`,
@@ -39,7 +47,7 @@ export async function createCustomerPortalSession(
   stripeCustomerId: string,
   baseUrl: string
 ) {
-  const session = await stripe.billingPortal.sessions.create({
+  const session = await getStripe().billingPortal.sessions.create({
     customer: stripeCustomerId,
     return_url: `${baseUrl}/settings/billing`,
   });

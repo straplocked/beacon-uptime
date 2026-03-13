@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { incidents, incidentUpdates, statusPages } from "@/lib/db/schema";
-import { getApiKeyUser } from "@/lib/auth/api-key";
+import { getApiKeyOrg } from "@/lib/auth/api-key";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { canUseApi } from "@/lib/plans";
@@ -17,15 +17,15 @@ const createIncidentSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const user = await getApiKeyUser(request);
-  if (!user) {
+  const org = await getApiKeyOrg(request);
+  if (!org) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!canUseApi(user.plan as PlanType)) {
+  if (!canUseApi(org.plan as PlanType)) {
     return NextResponse.json({ error: "API access not available on your plan" }, { status: 403 });
   }
 
-  const rateLimited = await withRateLimit(request, `api:${user.id}`, 60, 60);
+  const rateLimited = await withRateLimit(request, `api:${org.id}`, 60, 60);
   if (rateLimited) return rateLimited;
 
   const body = await request.json();
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     .where(
       and(
         eq(statusPages.id, data.statusPageId),
-        eq(statusPages.userId, user.id)
+        eq(statusPages.organizationId, org.id)
       )
     )
     .limit(1);
@@ -62,7 +62,8 @@ export async function POST(request: NextRequest) {
     const [incident] = await tx
       .insert(incidents)
       .values({
-        userId: user.id,
+        organizationId: org.id,
+        createdByUserId: null,
         statusPageId: data.statusPageId,
         title: data.title,
         status: data.status,

@@ -7,7 +7,7 @@ import {
   statusPageMonitors,
   statusPages,
   subscribers,
-  users,
+  organizations,
   notificationChannels,
 } from "@/lib/db/schema";
 import { eq, and, isNull, ne } from "drizzle-orm";
@@ -35,7 +35,7 @@ interface CheckResultData {
 export async function processCheckResult(
   monitor: {
     id: string;
-    userId: string;
+    organizationId: string;
     name: string;
     target: string;
     type: string;
@@ -92,7 +92,7 @@ export async function processCheckResult(
 }
 
 async function createAutoIncident(
-  monitor: { id: string; userId: string; name: string; target: string; type: string },
+  monitor: { id: string; organizationId: string; name: string; target: string; type: string },
   result: CheckResultData
 ) {
   // Find status pages that include this monitor
@@ -122,7 +122,8 @@ async function createAutoIncident(
     const [incident] = await db
       .insert(incidents)
       .values({
-        userId: monitor.userId,
+        organizationId: monitor.organizationId,
+        createdByUserId: null,
         statusPageId,
         title: `${monitor.name} is ${result.status === "down" ? "down" : "experiencing issues"}`,
         status: "investigating",
@@ -143,7 +144,7 @@ async function createAutoIncident(
 
     // Notify subscribers
     await enqueueSubscriberNotifications(
-      monitor.userId,
+      monitor.organizationId,
       statusPageId,
       incident.id,
       incident.title,
@@ -155,7 +156,7 @@ async function createAutoIncident(
 }
 
 async function resolveAutoIncidents(
-  monitor: { id: string; userId: string; name: string }
+  monitor: { id: string; organizationId: string; name: string }
 ) {
   const linkedPages = await db
     .select({ statusPageId: statusPageMonitors.statusPageId })
@@ -196,7 +197,7 @@ async function resolveAutoIncidents(
 }
 
 async function enqueueNotifications(
-  monitor: { id: string; userId: string; name: string; target: string; type: string },
+  monitor: { id: string; organizationId: string; name: string; target: string; type: string },
   previousStatus: string,
   newStatus: string,
   result: CheckResultData
@@ -205,7 +206,7 @@ async function enqueueNotifications(
   const channels = await db
     .select()
     .from(notificationChannels)
-    .where(eq(notificationChannels.userId, monitor.userId));
+    .where(eq(notificationChannels.organizationId, monitor.organizationId));
 
   if (channels.length === 0) return;
 
@@ -254,20 +255,20 @@ async function enqueueNotifications(
 }
 
 async function enqueueSubscriberNotifications(
-  userId: string,
+  organizationId: string,
   statusPageId: string,
   incidentId: string,
   incidentTitle: string,
   incidentMessage: string
 ) {
-  // Check if user's plan allows subscriber notifications
-  const [owner] = await db
-    .select({ plan: users.plan })
-    .from(users)
-    .where(eq(users.id, userId))
+  // Check if organization's plan allows subscriber notifications
+  const [org] = await db
+    .select({ plan: organizations.plan })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
     .limit(1);
 
-  if (!owner || !PLAN_LIMITS[owner.plan as PlanType]?.subscriberNotifications) {
+  if (!org || !PLAN_LIMITS[org.plan as PlanType]?.subscriberNotifications) {
     return;
   }
 

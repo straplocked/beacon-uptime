@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 
 export default async function DashboardLayout({
@@ -7,15 +7,17 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await getCurrentUser();
+  const ctx = await getAuthContext();
 
-  if (!user) {
+  if (!ctx) {
     redirect("/login");
   }
 
   return (
     <DashboardShell
-      user={{ id: user.id, name: user.name, email: user.email, plan: user.plan }}
+      user={{ id: ctx.user.id, name: ctx.user.name, email: ctx.user.email }}
+      organization={{ id: ctx.organization.id, name: ctx.organization.name, plan: ctx.organization.plan }}
+      role={ctx.role}
     >
       {children}
     </DashboardShell>

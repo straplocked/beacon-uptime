@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { statusPages } from "@/lib/db/schema";
-import { getCurrentUser } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 import { eq, desc } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,13 +9,13 @@ import { Plus, Globe, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
 export default async function StatusPagesPage() {
-  const user = await getCurrentUser();
-  if (!user) return null;
+  const ctx = await getAuthContext();
+  if (!ctx) return null;
 
   const pages = await db
     .select()
     .from(statusPages)
-    .where(eq(statusPages.userId, user.id))
+    .where(eq(statusPages.organizationId, ctx.organization.id))
     .orderBy(desc(statusPages.createdAt));
 
   return (

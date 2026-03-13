@@ -9,6 +9,7 @@ import {
   pgEnum,
   uniqueIndex,
   index,
+  unique,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import type { FooterConfig } from "@/lib/types/footer";
@@ -16,6 +17,12 @@ import type { FooterConfig } from "@/lib/types/footer";
 // ─── Enums ──────────────────────────────────────────────────────
 
 export const planEnum = pgEnum("plan", ["free", "pro", "team"]);
+export const memberRoleEnum = pgEnum("member_role", [
+  "owner",
+  "admin",
+  "member",
+  "viewer",
+]);
 export const monitorTypeEnum = pgEnum("monitor_type", [
   "http",
   "ping",
@@ -63,10 +70,6 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   name: text("name").notNull(),
-  plan: planEnum("plan").default("free").notNull(),
-  stripeCustomerId: text("stripe_customer_id"),
-  stripeSubscriptionId: text("stripe_subscription_id"),
-  apiKey: text("api_key").unique(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -74,6 +77,78 @@ export const users = pgTable("users", {
     .defaultNow()
     .notNull(),
 });
+
+// ─── Organizations ─────────────────────────────────────────────
+
+export const organizations = pgTable(
+  "organizations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: text("name").notNull(),
+    slug: text("slug").notNull().unique(),
+    plan: planEnum("plan").default("free").notNull(),
+    stripeCustomerId: text("stripe_customer_id"),
+    stripeSubscriptionId: text("stripe_subscription_id"),
+    apiKey: text("api_key").unique(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [uniqueIndex("organizations_slug_idx").on(table.slug)]
+);
+
+// ─── Organization Members ──────────────────────────────────────
+
+export const organizationMembers = pgTable(
+  "organization_members",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: memberRoleEnum("role").default("member").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("org_member_unique").on(table.organizationId, table.userId),
+    index("org_members_org_id_idx").on(table.organizationId),
+    index("org_members_user_id_idx").on(table.userId),
+  ]
+);
+
+// ─── Organization Invitations ──────────────────────────────────
+
+export const organizationInvitations = pgTable(
+  "organization_invitations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    role: memberRoleEnum("role").default("member").notNull(),
+    token: text("token").notNull().unique(),
+    invitedByUserId: uuid("invited_by_user_id")
+      .references(() => users.id, { onDelete: "set null" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("org_invitations_org_id_idx").on(table.organizationId),
+    uniqueIndex("org_invitations_token_idx").on(table.token),
+  ]
+);
 
 // ─── Sessions ───────────────────────────────────────────────────
 
@@ -94,9 +169,11 @@ export const monitors = pgTable(
   "monitors",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    userId: uuid("user_id")
+    organizationId: uuid("organization_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    createdByUserId: uuid("created_by_user_id")
+      .references(() => users.id, { onDelete: "set null" }),
     name: text("name").notNull(),
     type: monitorTypeEnum("type").notNull(),
     target: text("target").notNull(),
@@ -124,7 +201,10 @@ export const monitors = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [index("monitors_user_id_idx").on(table.userId)]
+  (table) => [
+    index("monitors_org_id_idx").on(table.organizationId),
+    index("monitors_created_by_idx").on(table.createdByUserId),
+  ]
 );
 
 // ─── Check Results (TimescaleDB hypertable) ─────────────────────
@@ -155,9 +235,11 @@ export const statusPages = pgTable(
   "status_pages",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    userId: uuid("user_id")
+    organizationId: uuid("organization_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    createdByUserId: uuid("created_by_user_id")
+      .references(() => users.id, { onDelete: "set null" }),
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
     customDomain: text("custom_domain").unique(),
@@ -183,7 +265,7 @@ export const statusPages = pgTable(
       .notNull(),
   },
   (table) => [
-    index("status_pages_user_id_idx").on(table.userId),
+    index("status_pages_org_id_idx").on(table.organizationId),
     uniqueIndex("status_pages_slug_idx").on(table.slug),
   ]
 );
@@ -217,9 +299,11 @@ export const incidents = pgTable(
   "incidents",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    userId: uuid("user_id")
+    organizationId: uuid("organization_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    createdByUserId: uuid("created_by_user_id")
+      .references(() => users.id, { onDelete: "set null" }),
     statusPageId: uuid("status_page_id")
       .notNull()
       .references(() => statusPages.id, { onDelete: "cascade" }),
@@ -236,7 +320,7 @@ export const incidents = pgTable(
   },
   (table) => [
     index("incidents_status_page_id_idx").on(table.statusPageId),
-    index("incidents_user_id_idx").on(table.userId),
+    index("incidents_org_id_idx").on(table.organizationId),
   ]
 );
 
@@ -264,9 +348,11 @@ export const notificationChannels = pgTable(
   "notification_channels",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    userId: uuid("user_id")
+    organizationId: uuid("organization_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    createdByUserId: uuid("created_by_user_id")
+      .references(() => users.id, { onDelete: "set null" }),
     type: notificationTypeEnum("type").notNull(),
     name: text("name").notNull(),
     config: jsonb("config")
@@ -280,7 +366,7 @@ export const notificationChannels = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [index("notification_channels_user_id_idx").on(table.userId)]
+  (table) => [index("notification_channels_org_id_idx").on(table.organizationId)]
 );
 
 // ─── Subscribers ────────────────────────────────────────────────
@@ -306,19 +392,60 @@ export const subscribers = pgTable(
 // ─── Relations ──────────────────────────────────────────────────
 
 export const usersRelations = relations(users, ({ many }) => ({
-  monitors: many(monitors),
   sessions: many(sessions),
+  organizationMembers: many(organizationMembers),
+}));
+
+export const organizationsRelations = relations(organizations, ({ many }) => ({
+  members: many(organizationMembers),
+  invitations: many(organizationInvitations),
+  monitors: many(monitors),
   statusPages: many(statusPages),
   incidents: many(incidents),
   notificationChannels: many(notificationChannels),
 }));
+
+export const organizationMembersRelations = relations(
+  organizationMembers,
+  ({ one }) => ({
+    organization: one(organizations, {
+      fields: [organizationMembers.organizationId],
+      references: [organizations.id],
+    }),
+    user: one(users, {
+      fields: [organizationMembers.userId],
+      references: [users.id],
+    }),
+  })
+);
+
+export const organizationInvitationsRelations = relations(
+  organizationInvitations,
+  ({ one }) => ({
+    organization: one(organizations, {
+      fields: [organizationInvitations.organizationId],
+      references: [organizations.id],
+    }),
+    invitedBy: one(users, {
+      fields: [organizationInvitations.invitedByUserId],
+      references: [users.id],
+    }),
+  })
+);
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
   user: one(users, { fields: [sessions.userId], references: [users.id] }),
 }));
 
 export const monitorsRelations = relations(monitors, ({ one, many }) => ({
-  user: one(users, { fields: [monitors.userId], references: [users.id] }),
+  organization: one(organizations, {
+    fields: [monitors.organizationId],
+    references: [organizations.id],
+  }),
+  createdBy: one(users, {
+    fields: [monitors.createdByUserId],
+    references: [users.id],
+  }),
   checkResults: many(checkResults),
   statusPageMonitors: many(statusPageMonitors),
 }));
@@ -331,7 +458,14 @@ export const checkResultsRelations = relations(checkResults, ({ one }) => ({
 }));
 
 export const statusPagesRelations = relations(statusPages, ({ one, many }) => ({
-  user: one(users, { fields: [statusPages.userId], references: [users.id] }),
+  organization: one(organizations, {
+    fields: [statusPages.organizationId],
+    references: [organizations.id],
+  }),
+  createdBy: one(users, {
+    fields: [statusPages.createdByUserId],
+    references: [users.id],
+  }),
   statusPageMonitors: many(statusPageMonitors),
   incidents: many(incidents),
   subscribers: many(subscribers),
@@ -352,7 +486,14 @@ export const statusPageMonitorsRelations = relations(
 );
 
 export const incidentsRelations = relations(incidents, ({ one, many }) => ({
-  user: one(users, { fields: [incidents.userId], references: [users.id] }),
+  organization: one(organizations, {
+    fields: [incidents.organizationId],
+    references: [organizations.id],
+  }),
+  createdBy: one(users, {
+    fields: [incidents.createdByUserId],
+    references: [users.id],
+  }),
   statusPage: one(statusPages, {
     fields: [incidents.statusPageId],
     references: [statusPages.id],
@@ -373,8 +514,12 @@ export const incidentUpdatesRelations = relations(
 export const notificationChannelsRelations = relations(
   notificationChannels,
   ({ one }) => ({
-    user: one(users, {
-      fields: [notificationChannels.userId],
+    organization: one(organizations, {
+      fields: [notificationChannels.organizationId],
+      references: [organizations.id],
+    }),
+    createdBy: one(users, {
+      fields: [notificationChannels.createdByUserId],
       references: [users.id],
     }),
   })

@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { incidents, statusPages } from "@/lib/db/schema";
-import { getCurrentUser } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 import { eq, desc } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,8 +9,8 @@ import { Plus, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 
 export default async function IncidentsPage() {
-  const user = await getCurrentUser();
-  if (!user) return null;
+  const ctx = await getAuthContext();
+  if (!ctx) return null;
 
   const userIncidents = await db
     .select({
@@ -19,7 +19,7 @@ export default async function IncidentsPage() {
     })
     .from(incidents)
     .innerJoin(statusPages, eq(incidents.statusPageId, statusPages.id))
-    .where(eq(incidents.userId, user.id))
+    .where(eq(incidents.organizationId, ctx.organization.id))
     .orderBy(desc(incidents.createdAt));
 
   const impactColors: Record<string, string> = {

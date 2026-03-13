@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { incidents } from "@/lib/db/schema";
-import { getApiKeyUser } from "@/lib/auth/api-key";
+import { getApiKeyOrg } from "@/lib/auth/api-key";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { canUseApi } from "@/lib/plans";
@@ -18,15 +18,15 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await getApiKeyUser(request);
-  if (!user) {
+  const org = await getApiKeyOrg(request);
+  if (!org) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!canUseApi(user.plan as PlanType)) {
+  if (!canUseApi(org.plan as PlanType)) {
     return NextResponse.json({ error: "API access not available on your plan" }, { status: 403 });
   }
 
-  const rateLimited = await withRateLimit(request, `api:${user.id}`, 60, 60);
+  const rateLimited = await withRateLimit(request, `api:${org.id}`, 60, 60);
   if (rateLimited) return rateLimited;
 
   const { id } = await params;
@@ -34,7 +34,7 @@ export async function PATCH(
   const [existing] = await db
     .select()
     .from(incidents)
-    .where(and(eq(incidents.id, id), eq(incidents.userId, user.id)))
+    .where(and(eq(incidents.id, id), eq(incidents.organizationId, org.id)))
     .limit(1);
 
   if (!existing) {

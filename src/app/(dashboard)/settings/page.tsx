@@ -1,4 +1,4 @@
-import { getCurrentUser } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PLAN_LIMITS } from "@/lib/plans";
@@ -7,17 +7,17 @@ import { BillingSection } from "@/components/dashboard/billing-section";
 import { ApiKeySection } from "@/components/dashboard/api-key-section";
 
 export default async function SettingsPage() {
-  const user = await getCurrentUser();
-  if (!user) return null;
+  const ctx = await getAuthContext();
+  if (!ctx) return null;
 
-  const plan = user.plan as PlanType;
+  const plan = ctx.organization.plan as PlanType;
   const limits = PLAN_LIMITS[plan];
 
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
         <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-muted-foreground">Manage your account</p>
+        <p className="text-muted-foreground">Manage your account and organization</p>
       </div>
 
       {/* Account info */}
@@ -28,17 +28,34 @@ export default async function SettingsPage() {
         <CardContent className="space-y-4">
           <div className="flex justify-between">
             <span className="text-sm text-muted-foreground">Name</span>
-            <span className="text-sm font-medium">{user.name}</span>
+            <span className="text-sm font-medium">{ctx.user.name}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-sm text-muted-foreground">Email</span>
-            <span className="text-sm font-medium">{user.email}</span>
+            <span className="text-sm font-medium">{ctx.user.email}</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Organization info */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Organization</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex justify-between">
+            <span className="text-sm text-muted-foreground">Name</span>
+            <span className="text-sm font-medium">{ctx.organization.name}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-sm text-muted-foreground">Plan</span>
             <Badge variant="secondary" className="capitalize">
-              {user.plan}
+              {ctx.organization.plan}
             </Badge>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-sm text-muted-foreground">Your Role</span>
+            <span className="text-sm font-medium capitalize">{ctx.role}</span>
           </div>
         </CardContent>
       </Card>
@@ -71,8 +88,8 @@ export default async function SettingsPage() {
               <p className="font-medium">{limits.customDomain ? "Yes" : "No"}</p>
             </div>
             <div>
-              <p className="text-muted-foreground">API Access</p>
-              <p className="font-medium">{limits.apiAccess ? "Yes" : "No"}</p>
+              <p className="text-muted-foreground">Team Members</p>
+              <p className="font-medium">{limits.teamMembers}</p>
             </div>
           </div>
         </CardContent>
@@ -80,14 +97,14 @@ export default async function SettingsPage() {
 
       {/* API Key */}
       <ApiKeySection
-        hasApiKey={!!user.apiKey}
+        hasApiKey={!!ctx.organization.apiKey}
         canUseApi={limits.apiAccess}
       />
 
       {/* Billing */}
       <BillingSection
-        plan={user.plan}
-        stripeCustomerId={user.stripeCustomerId}
+        plan={ctx.organization.plan}
+        stripeCustomerId={ctx.organization.stripeCustomerId}
       />
     </div>
   );

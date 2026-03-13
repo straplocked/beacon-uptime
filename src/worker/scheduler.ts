@@ -106,7 +106,7 @@ async function checkHeartbeats() {
       await processCheckResult(
         {
           id: monitor.id,
-          userId: monitor.userId,
+          organizationId: monitor.organizationId,
           name: monitor.name,
           target: monitor.target,
           type: monitor.type,
@@ -138,23 +138,23 @@ const PLAN_RETENTION_DAYS: Record<string, number> = {
 
 async function cleanupOldData() {
   try {
-    // Get all users with their plan
-    const allUsers = await db
-      .select({ id: schema.users.id, plan: schema.users.plan })
-      .from(schema.users);
+    // Get all organizations with their plan
+    const allOrgs = await db
+      .select({ id: schema.organizations.id, plan: schema.organizations.plan })
+      .from(schema.organizations);
 
     let totalDeleted = 0;
 
-    for (const user of allUsers) {
-      const retentionDays = PLAN_RETENTION_DAYS[user.plan] || 7;
+    for (const org of allOrgs) {
+      const retentionDays = PLAN_RETENTION_DAYS[org.plan] || 7;
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - retentionDays);
 
-      // Delete old check results for this user's monitors
+      // Delete old check results for this organization's monitors
       const result = await db.execute(sql`
         DELETE FROM check_results
         WHERE monitor_id IN (
-          SELECT id FROM monitors WHERE user_id = ${user.id}
+          SELECT id FROM monitors WHERE organization_id = ${org.id}
         )
         AND time < ${cutoff.toISOString()}::timestamptz
       `);

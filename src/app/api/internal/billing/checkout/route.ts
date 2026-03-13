@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
+import { canManageBilling } from "@/lib/auth/permissions";
 import { createCheckoutSession } from "@/lib/stripe";
 import { z } from "zod";
 
@@ -8,9 +9,16 @@ const checkoutSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const ctx = await getAuthContext();
+  if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!canManageBilling(ctx.role)) {
+    return NextResponse.json(
+      { error: "Only the organization owner can manage billing" },
+      { status: 403 }
+    );
   }
 
   const body = await request.json();
@@ -27,10 +35,11 @@ export async function POST(request: NextRequest) {
 
   try {
     const session = await createCheckoutSession(
-      user.id,
-      user.email,
+      ctx.organization.id,
+      ctx.user.email,
       parsed.data.plan,
-      baseUrl
+      baseUrl,
+      ctx.organization.stripeCustomerId ?? undefined
     );
 
     return NextResponse.json({ url: session.url });

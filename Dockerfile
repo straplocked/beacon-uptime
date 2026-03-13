@@ -1,7 +1,7 @@
 FROM node:20-alpine AS base
 
 # Install dependencies for native modules + ping utility
-RUN apk add --no-cache libc6-compat iputils
+RUN apk add --no-cache libc6-compat iputils wget
 
 WORKDIR /app
 
@@ -39,6 +39,9 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src/lib/db/migrations ./src/lib/db/migrations
 
+# Copy entrypoint for auto-migration
+COPY --from=builder /app/entrypoint.sh ./entrypoint.sh
+
 USER nextjs
 
 EXPOSE 3000
@@ -46,4 +49,4 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "server.js"]
+ENTRYPOINT ["./entrypoint.sh"]

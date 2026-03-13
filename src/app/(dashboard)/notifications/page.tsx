@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { notificationChannels } from "@/lib/db/schema";
-import { getCurrentUser } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 import { eq, desc } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,13 +8,13 @@ import { Bell, Mail, MessageSquare, Webhook } from "lucide-react";
 import { AddChannelForm } from "@/components/dashboard/add-channel-form";
 
 export default async function NotificationsPage() {
-  const user = await getCurrentUser();
-  if (!user) return null;
+  const ctx = await getAuthContext();
+  if (!ctx) return null;
 
   const channels = await db
     .select()
     .from(notificationChannels)
-    .where(eq(notificationChannels.userId, user.id))
+    .where(eq(notificationChannels.organizationId, ctx.organization.id))
     .orderBy(desc(notificationChannels.createdAt));
 
   const typeIcons: Record<string, React.ReactNode> = {

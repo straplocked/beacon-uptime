@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { incidents, incidentUpdates, statusPages } from "@/lib/db/schema";
-import { getCurrentUser } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 import { eq, and, asc } from "drizzle-orm";
 import { z } from "zod";
+import { canEditResources } from "@/lib/auth/permissions";
 
 const updateIncidentSchema = z.object({
   title: z.string().min(1).max(200).optional(),
@@ -17,8 +18,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const ctx = await getAuthContext();
+  if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -32,7 +33,7 @@ export async function GET(
     })
     .from(incidents)
     .innerJoin(statusPages, eq(incidents.statusPageId, statusPages.id))
-    .where(and(eq(incidents.id, id), eq(incidents.userId, user.id)))
+    .where(and(eq(incidents.id, id), eq(incidents.organizationId, ctx.organization.id)))
     .limit(1);
 
   if (!incident) {
@@ -55,9 +56,13 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const ctx = await getAuthContext();
+  if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!canEditResources(ctx.role)) {
+    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
   }
 
   const { id } = await params;
@@ -65,7 +70,7 @@ export async function PATCH(
   const [existing] = await db
     .select()
     .from(incidents)
-    .where(and(eq(incidents.id, id), eq(incidents.userId, user.id)))
+    .where(and(eq(incidents.id, id), eq(incidents.organizationId, ctx.organization.id)))
     .limit(1);
 
   if (!existing) {

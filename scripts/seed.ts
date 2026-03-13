@@ -45,7 +45,6 @@ async function main() {
       email: "demo@beacon.local",
       passwordHash,
       name: "Demo User",
-      plan: "pro",
     })
     .onConflictDoNothing()
     .returning();
@@ -58,11 +57,31 @@ async function main() {
 
   console.log(`[seed] Created user: ${user.email} (${user.id})`);
 
+  // Create personal organization
+  const [org] = await db
+    .insert(schema.organizations)
+    .values({
+      name: "Demo Organization",
+      slug: "demo-at-beacon-local",
+      plan: "pro",
+    })
+    .returning();
+
+  console.log(`[seed] Created organization: ${org.name} (${org.id})`);
+
+  // Create owner membership
+  await db.insert(schema.organizationMembers).values({
+    organizationId: org.id,
+    userId: user.id,
+    role: "owner",
+  });
+
   // Create monitors
   const [httpMonitor] = await db
     .insert(schema.monitors)
     .values({
-      userId: user.id,
+      organizationId: org.id,
+      createdByUserId: user.id,
       name: "Beacon Homepage",
       type: "http",
       target: "https://beacon.pluginsynthesis.com",
@@ -77,7 +96,8 @@ async function main() {
   const [apiMonitor] = await db
     .insert(schema.monitors)
     .values({
-      userId: user.id,
+      organizationId: org.id,
+      createdByUserId: user.id,
       name: "Google DNS",
       type: "dns",
       target: "google.com",
@@ -90,7 +110,8 @@ async function main() {
   const [sslMonitor] = await db
     .insert(schema.monitors)
     .values({
-      userId: user.id,
+      organizationId: org.id,
+      createdByUserId: user.id,
       name: "GitHub SSL",
       type: "ssl",
       target: "github.com",
@@ -106,7 +127,8 @@ async function main() {
   const [statusPage] = await db
     .insert(schema.statusPages)
     .values({
-      userId: user.id,
+      organizationId: org.id,
+      createdByUserId: user.id,
       name: "Beacon Status",
       slug: "beacon",
       brandColor: "#10b981",
@@ -146,7 +168,8 @@ async function main() {
 
   // Create a default email notification channel
   await db.insert(schema.notificationChannels).values({
-    userId: user.id,
+    organizationId: org.id,
+    createdByUserId: user.id,
     type: "email",
     name: "Primary Email",
     config: { email: "demo@beacon.local" },

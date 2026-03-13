@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { monitors, checkResults } from "@/lib/db/schema";
-import { getCurrentUser } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 import { eq, and, desc } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { notFound } from "next/navigation";
@@ -19,15 +19,15 @@ export default async function MonitorDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const user = await getCurrentUser();
-  if (!user) return null;
+  const ctx = await getAuthContext();
+  if (!ctx) return null;
 
   const { id } = await params;
 
   const [monitor] = await db
     .select()
     .from(monitors)
-    .where(and(eq(monitors.id, id), eq(monitors.userId, user.id)))
+    .where(and(eq(monitors.id, id), eq(monitors.organizationId, ctx.organization.id)))
     .limit(1);
 
   if (!monitor) notFound();
