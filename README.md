@@ -335,6 +335,17 @@ npm run db:studio     # Open Drizzle Studio
 npm run db:seed       # Seed demo data
 ```
 
+## Documentation
+
+| Doc | Purpose |
+|-----|---------|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture: processes, queues, schema |
+| [docs/API.md](docs/API.md) | REST API reference (`/api/v1/*`) |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Production deployment (Docker, Unraid, NPM) |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Sprint-by-sprint roadmap for the 2026-Q2/Q3 UI overhaul + 3 differentiators |
+| [docs/design/system.md](docs/design/system.md) | Current design system audit (Phase 0 baseline) |
+| [docs/design/handoff-2026-q2.md](docs/design/handoff-2026-q2.md) | Design direction brief for the redesign |
+
 ## License
 
 Private
