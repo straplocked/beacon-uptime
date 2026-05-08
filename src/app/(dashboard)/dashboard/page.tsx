@@ -11,7 +11,7 @@ import { McpRail } from "./_components/mcp-rail";
 import {
   MonitorTable,
   type MonitorRow,
-} from "./_components/monitor-table";
+} from "@/components/monitors/monitor-table";
 import { StatCards, type DashboardStats } from "./_components/stat-cards";
 
 import { getAuthContext } from "@/lib/auth";

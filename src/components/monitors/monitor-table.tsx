@@ -65,9 +65,34 @@ function severityToken(s: "minor" | "major" | "critical") {
 
 type SortCol = "status" | "name" | "response";
 
-export function MonitorTable({ monitors }: { monitors: MonitorRow[] }) {
+export interface MonitorTableProps {
+  monitors: MonitorRow[];
+  /**
+   * Section title rendered inside the table card. Set to null to hide the
+   * internal header (e.g. when the page itself owns the title chrome).
+   * @default "Monitors"
+   */
+  title?: string | null;
+  /** Auto-expand the first non-up monitor (default true). */
+  autoExpandFirstIssue?: boolean;
+  /** Render type filter chips alongside status filters. */
+  enableTypeFilter?: boolean;
+  /** Optional list of available monitor types for the type filter. */
+  availableTypes?: string[];
+  /** Compact = no border / no rounded card wrapper (page already provides chrome). */
+  bare?: boolean;
+}
+
+export function MonitorTable({
+  monitors,
+  title = "Monitors",
+  autoExpandFirstIssue = true,
+  enableTypeFilter = false,
+  availableTypes = [],
+  bare = false,
+}: MonitorTableProps) {
   const [expanded, setExpanded] = useState<string | null>(() => {
-    // Auto-expand the first non-up monitor for visibility.
+    if (!autoExpandFirstIssue) return null;
     const first = monitors.find(
       (m) => m.status !== "up" && m.status !== "paused",
     );
@@ -78,10 +103,13 @@ export function MonitorTable({ monitors }: { monitors: MonitorRow[] }) {
     dir: "asc",
   });
   const [filter, setFilter] = useState<"all" | MonitorStatus>("all");
+  const [typeFilter, setTypeFilter] = useState<string | "all">("all");
 
   const sorted = useMemo(() => {
-    const arr =
-      filter === "all" ? [...monitors] : monitors.filter((m) => m.status === filter);
+    let arr = filter === "all" ? [...monitors] : monitors.filter((m) => m.status === filter);
+    if (typeFilter !== "all") {
+      arr = arr.filter((m) => m.type.toLowerCase() === typeFilter.toLowerCase());
+    }
     if (sort.col === "status") {
       arr.sort(
         (a, b) =>
@@ -118,60 +146,94 @@ export function MonitorTable({ monitors }: { monitors: MonitorRow[] }) {
     return c;
   }, [monitors]);
 
+  const wrapperCn = bare
+    ? "overflow-hidden"
+    : "bg-card border border-border rounded-lg overflow-hidden";
+
+  const filterRow = (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <FilterChip
+        label="All"
+        active={filter === "all"}
+        onClick={() => setFilter("all")}
+      />
+      <FilterChip
+        label="Up"
+        count={counts.up}
+        active={filter === "up"}
+        onClick={() => setFilter("up")}
+      />
+      {counts.degraded > 0 && (
+        <FilterChip
+          label="Degraded"
+          count={counts.degraded}
+          active={filter === "degraded"}
+          onClick={() => setFilter("degraded")}
+        />
+      )}
+      {counts.down > 0 && (
+        <FilterChip
+          label="Down"
+          count={counts.down}
+          active={filter === "down"}
+          onClick={() => setFilter("down")}
+        />
+      )}
+      {counts.paused > 0 && (
+        <FilterChip
+          label="Paused"
+          count={counts.paused}
+          active={filter === "paused"}
+          onClick={() => setFilter("paused")}
+        />
+      )}
+      {enableTypeFilter && availableTypes.length > 0 && (
+        <>
+          <span className="w-px h-4 bg-border mx-1" aria-hidden />
+          <FilterChip
+            label="All types"
+            active={typeFilter === "all"}
+            onClick={() => setTypeFilter("all")}
+          />
+          {availableTypes.map((t) => (
+            <FilterChip
+              key={t}
+              label={t.toUpperCase()}
+              active={typeFilter === t.toLowerCase()}
+              onClick={() => setTypeFilter(t.toLowerCase())}
+            />
+          ))}
+        </>
+      )}
+      {title !== null && (
+        <Link
+          href="/monitors/new"
+          className="ml-1 inline-flex items-center gap-1 h-6 px-2 rounded-md border border-transparent bg-primary text-primary-foreground text-[11.5px] font-medium hover:opacity-95 transition-opacity"
+        >
+          <Plus className="h-3 w-3" />
+          New monitor
+        </Link>
+      )}
+    </div>
+  );
+
   return (
-    <div className="bg-card border border-border rounded-lg overflow-hidden">
-      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border">
-        <h2 className="text-[13px] font-semibold m-0 tracking-[-0.005em]">
-          Monitors{" "}
-          <span className="text-muted-foreground font-normal">
-            · {monitors.length}
-          </span>
-        </h2>
-        <div className="ml-auto flex items-center gap-1.5">
-          <FilterChip
-            label="All"
-            active={filter === "all"}
-            onClick={() => setFilter("all")}
-          />
-          <FilterChip
-            label="Up"
-            count={counts.up}
-            active={filter === "up"}
-            onClick={() => setFilter("up")}
-          />
-          {counts.degraded > 0 && (
-            <FilterChip
-              label="Degraded"
-              count={counts.degraded}
-              active={filter === "degraded"}
-              onClick={() => setFilter("degraded")}
-            />
-          )}
-          {counts.down > 0 && (
-            <FilterChip
-              label="Down"
-              count={counts.down}
-              active={filter === "down"}
-              onClick={() => setFilter("down")}
-            />
-          )}
-          {counts.paused > 0 && (
-            <FilterChip
-              label="Paused"
-              count={counts.paused}
-              active={filter === "paused"}
-              onClick={() => setFilter("paused")}
-            />
-          )}
-          <Link
-            href="/monitors/new"
-            className="ml-1 inline-flex items-center gap-1 h-6 px-2 rounded-md border border-transparent bg-primary text-primary-foreground text-[11.5px] font-medium hover:opacity-95 transition-opacity"
-          >
-            <Plus className="h-3 w-3" />
-            New monitor
-          </Link>
+    <div className={wrapperCn}>
+      {title !== null ? (
+        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border flex-wrap">
+          <h2 className="text-[13px] font-semibold m-0 tracking-[-0.005em]">
+            {title}{" "}
+            <span className="text-muted-foreground font-normal">
+              · {monitors.length}
+            </span>
+          </h2>
+          <div className="ml-auto flex items-center gap-1.5 flex-wrap">
+            {filterRow}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="px-4 py-3 border-b border-border">{filterRow}</div>
+      )}
 
       {sorted.length === 0 ? (
         <EmptyState filtered={filter !== "all"} />
