@@ -3,15 +3,17 @@
  *
  * Visual spec: docs/design/handoff-2026-q2.md §12 (P-DASH "MCP rail").
  *
- * For now this is purely informational — the MCP server itself ships in
- * Sprint 7. The visual presence here primes users on what's coming.
+ * As of Sprint 7 the endpoint is live. The "Available" pill turns into
+ * "Connected" once at least one MCP client has called within the last
+ * window — but we don't track per-call telemetry yet, so for now we
+ * surface the static tool count and let the user decide.
  */
 
 import Link from "next/link";
 
 export interface McpRailProps {
-  /** True when the MCP server endpoint is up and reachable. */
-  connected: boolean;
+  /** Whether the user has an API key provisioned (gates MCP usage). */
+  hasApiKey: boolean;
   /** Number of tools currently exposed. */
   toolCount: number;
   /** Last call timestamp, e.g. "2m ago". Null if never called. */
@@ -21,11 +23,16 @@ export interface McpRailProps {
 }
 
 export function McpRail({
-  connected,
+  hasApiKey,
   toolCount,
   lastCallAgo,
   endpoint,
 }: McpRailProps) {
+  const indicatorLabel = hasApiKey ? "Available" : "Setup needed";
+  const indicatorColor = hasApiKey
+    ? "var(--status-up)"
+    : "var(--muted-foreground)";
+  const indicatorHalo = hasApiKey ? "var(--status-up-soft)" : undefined;
   return (
     <section
       className="rounded-lg border border-border p-3.5 mt-3"
@@ -48,9 +55,7 @@ export function McpRail({
         <span>MCP server</span>
         <span
           className="ml-auto flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-medium"
-          style={{
-            color: connected ? "var(--status-up)" : "var(--muted-foreground)",
-          }}
+          style={{ color: indicatorColor }}
         >
           <span
             aria-hidden
@@ -58,24 +63,27 @@ export function McpRail({
             style={{
               width: 5,
               height: 5,
-              background: connected
-                ? "var(--status-up)"
-                : "var(--muted-foreground)",
-              boxShadow: connected
-                ? "0 0 0 3px var(--status-up-soft)"
-                : undefined,
+              background: indicatorColor,
+              boxShadow: indicatorHalo ? `0 0 0 3px ${indicatorHalo}` : undefined,
             }}
           />
-          {connected ? "Connected" : "Coming soon"}
+          {indicatorLabel}
         </span>
       </div>
       <p className="text-[11.5px] text-muted-foreground my-2 leading-relaxed">
-        {connected ? (
+        {hasApiKey ? (
           <>
-            Claude is connected via your{" "}
-            <code className="font-mono text-[11px]">bk_</code> API key.{" "}
-            {toolCount} tool{toolCount === 1 ? "" : "s"} exposed.
-            {lastCallAgo ? ` Last call ${lastCallAgo}.` : ""}
+            {toolCount} tool{toolCount === 1 ? "" : "s"} exposed via your{" "}
+            <code className="font-mono text-[11px]">bk_</code> API key.
+            {lastCallAgo
+              ? ` Last call ${lastCallAgo}.`
+              : " Connect Claude Desktop, Claude Code, or Cursor to start using them."}{" "}
+            <Link
+              href="/docs/MCP"
+              className="text-primary hover:underline whitespace-nowrap"
+            >
+              Setup →
+            </Link>
           </>
         ) : (
           <>

@@ -3,6 +3,9 @@ import { ChevronDown, Filter, Plus } from "lucide-react";
 import Link from "next/link";
 
 import { ActivityRail, type ActivityEntry } from "./_components/activity-rail";
+
+/** Number of tools currently registered in src/lib/mcp/server.ts. */
+const MCP_TOOL_COUNT = 14;
 import {
   IncidentBanner,
   type ActiveIncidentSummary,
@@ -545,8 +548,8 @@ export default async function DashboardPage() {
         <div className="flex flex-col gap-3">
           <ActivityRail activity={activitySorted} />
           <McpRail
-            connected={false}
-            toolCount={0}
+            hasApiKey={!!ctx.organization.apiKey}
+            toolCount={MCP_TOOL_COUNT}
             lastCallAgo={null}
             endpoint={mcpEndpoint}
           />

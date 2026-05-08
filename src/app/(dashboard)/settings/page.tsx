@@ -91,28 +91,49 @@ export default async function SettingsPage() {
                 M
               </span>
               MCP server
-              <span className="ml-auto text-[10px] uppercase tracking-wider font-medium text-muted-foreground">
-                Coming soon
+              <span
+                className="ml-auto flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-medium"
+                style={{
+                  color: ctx.organization.apiKey
+                    ? "var(--status-up)"
+                    : "var(--muted-foreground)",
+                }}
+              >
+                <span
+                  aria-hidden
+                  className="rounded-full animate-pulse-dot"
+                  style={{
+                    width: 5,
+                    height: 5,
+                    background: ctx.organization.apiKey
+                      ? "var(--status-up)"
+                      : "var(--muted-foreground)",
+                    boxShadow: ctx.organization.apiKey
+                      ? "0 0 0 3px var(--status-up-soft)"
+                      : undefined,
+                  }}
+                />
+                {ctx.organization.apiKey ? "Available" : "Setup needed"}
               </span>
             </div>
             <p className="text-[11.5px] text-muted-foreground mb-2 leading-relaxed">
-              Once enabled, point Claude Desktop, Claude Code, Cursor, or any
-              MCP client at your Beacon API key to manage monitors, query
-              uptime, and acknowledge incidents from chat.
+              Point Claude Desktop, Claude Code, Cursor, or any MCP client at
+              your Beacon API key to manage monitors, query uptime, and
+              acknowledge incidents from chat. {ctx.organization.apiKey
+                ? "14 tools exposed."
+                : "Generate an API key below to enable."}
             </p>
-            <div
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded border border-border bg-background font-mono text-[11px] overflow-hidden"
-            >
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded border border-border bg-background font-mono text-[11px] overflow-hidden">
               <span className="text-muted-foreground">$</span>
               <span className="truncate">mcp-remote {mcpEndpoint}</span>
             </div>
             <p className="text-[11px] text-muted-foreground mt-2">
-              Tracking issue:{" "}
+              Full reference:{" "}
               <Link
-                href="/"
+                href="/docs/MCP"
                 className="text-primary hover:underline whitespace-nowrap"
               >
-                Sprint 7 → MCP server
+                docs/MCP.md →
               </Link>
             </p>
           </div>
