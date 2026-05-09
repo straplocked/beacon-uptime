@@ -76,7 +76,8 @@ All tools act on the authenticated organization. Cross-org access is structurall
 | `list_incidents`      | `openOnly?` (default false), `limit?` (max 200, default 50)                                                                       | Array of incidents (id, title, status, impact, dates).  |
 | `get_incident`        | `id`                                                                                                                              | Incident + full update timeline.                        |
 | `create_incident`     | `statusPageId`, `title`, `impact?` (none\|minor\|major\|critical), `status?` (investigating\|identified\|monitoring\|resolved), `message?` | Created incident.                                       |
-| `add_incident_update` | `incidentId`, `status`, `message`                                                                                                 | Created update; rolls up incident status automatically. |
+| `add_incident_update` | `incidentId`, `status`, `message`, `kind?` (`status` \| `comment`, default `status`)                                              | Created update. `status` kind rolls up the incident; `comment` kind is internal-only and does NOT publish or change incident state. |
+| `acknowledge_incident` | `id`                                                                                                                             | Claims the incident: sets `acknowledgedAt` and emits a `system` timeline entry. Idempotent — second calls return `{ alreadyAcknowledged: true }`. |
 
 ### Status pages
 
@@ -226,7 +227,8 @@ Things an MCP-aware agent can do that the dashboard alone can't easily script:
 
 ## Roadmap
 
-- **`acknowledge_incident`** tool lands once Sprint 5 adds `incidents.acknowledgedAt` / `acknowledgedBy` (Differentiator #1).
+- **`acknowledge_incident`** ✅ landed in Sprint 5 (Differentiator #1).
+- **`add_incident_update` with `kind: 'comment'`** ✅ landed in Sprint 5 — internal-only updates that don't publish to subscribers.
 - **`extract_status_page_palette`** tool lands once Sprint 6 implements palette extraction from a favicon URL (Differentiator #2).
 - **Per-tool telemetry** (last call timestamp, count) — captured for the live MCP rail.
 - **Hashed token storage** — current implementation stores the raw key on `organizations.apiKey`; a future hardening pass moves this to a `api_tokens` table with SHA-256 hashes and per-token names/scopes.
