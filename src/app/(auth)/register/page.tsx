@@ -1,13 +1,21 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+import { BeaconMark } from "@/components/brand/mark";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -32,7 +40,6 @@ export default function RegisterPage() {
       });
 
       const data = await res.json();
-
       if (!res.ok) {
         setError(data.error || "Registration failed");
         return;
@@ -48,45 +55,70 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted px-4 relative">
-      <div className="glow-orbs" />
-      <Card className="w-full max-w-md glow-surface relative z-10">
-        <CardHeader className="text-center">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Activity className="h-6 w-6 text-primary" />
-            <span className="text-xl font-extrabold uppercase tracking-wider font-display">BEACON</span>
+    <div className="min-h-screen flex items-center justify-center bg-background px-4 relative">
+      <div className="glow-orbs" aria-hidden />
+      <Card className="w-full max-w-[400px] relative z-10">
+        <CardHeader className="text-center pb-4">
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <span className="text-primary">
+              <BeaconMark size={24} />
+            </span>
+            <span className="font-display font-bold text-[14px] tracking-[0.18em]">
+              BEACON
+            </span>
           </div>
-          <CardTitle>Create your account</CardTitle>
-          <CardDescription>Start monitoring your services in minutes</CardDescription>
+          <CardTitle className="text-[18px] font-semibold tracking-[-0.005em]">
+            Create your account
+          </CardTitle>
+          <CardDescription className="text-[12.5px] mt-0.5">
+            Start monitoring your services in minutes
+          </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3.5">
             {error && (
-              <div className="bg-destructive/10 text-destructive text-sm rounded-md p-3">
+              <div
+                role="alert"
+                className="text-[12.5px] rounded-md p-2.5 border"
+                style={{
+                  background: "oklch(from var(--destructive) l c h / 0.10)",
+                  borderColor:
+                    "oklch(from var(--destructive) l c h / 0.30)",
+                  color: "var(--destructive)",
+                }}
+              >
                 {error}
               </div>
             )}
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="name" className="text-[12px]">
+                Name
+              </Label>
               <Input
                 id="name"
                 name="name"
                 placeholder="Your name"
                 required
+                autoComplete="name"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="text-[12px]">
+                Email
+              </Label>
               <Input
                 id="email"
                 name="email"
                 type="email"
                 placeholder="you@example.com"
                 required
+                autoComplete="email"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="password" className="text-[12px]">
+                Password
+              </Label>
               <Input
                 id="password"
                 name="password"
@@ -94,17 +126,18 @@ export default function RegisterPage() {
                 placeholder="••••••••"
                 minLength={8}
                 required
+                autoComplete="new-password"
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[11px] text-muted-foreground">
                 Must be at least 8 characters
               </p>
             </div>
           </CardContent>
-          <CardFooter className="flex flex-col gap-4">
-            <Button type="submit" className="w-full glow-btn" disabled={loading}>
-              {loading ? "Creating account..." : "Create account"}
+          <CardFooter className="flex flex-col gap-3">
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Creating account…" : "Create account"}
             </Button>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-[12px] text-muted-foreground">
               Already have an account?{" "}
               <Link href="/login" className="text-primary hover:underline">
                 Sign in

@@ -3,11 +3,17 @@ import { db } from "@/lib/db";
 import { organizations } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
-export async function getApiKeyOrg(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) return null;
+type Org = typeof organizations.$inferSelect;
 
-  const apiKey = authHeader.slice(7);
+/**
+ * Resolve a `Bearer bk_...` Authorization header to the owning organization.
+ * Returns null on missing/invalid header or unknown key.
+ */
+export async function resolveApiKey(
+  authHeader: string | null,
+): Promise<Org | null> {
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  const apiKey = authHeader.slice(7).trim();
   if (!apiKey) return null;
 
   const [org] = await db
@@ -17,6 +23,11 @@ export async function getApiKeyOrg(request: NextRequest) {
     .limit(1);
 
   return org ?? null;
+}
+
+/** NextRequest convenience wrapper used by /api/v1/* routes. */
+export async function getApiKeyOrg(request: NextRequest): Promise<Org | null> {
+  return resolveApiKey(request.headers.get("authorization"));
 }
 
 export function generateApiKey(): string {
