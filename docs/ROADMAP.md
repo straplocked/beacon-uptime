@@ -15,6 +15,22 @@ Total: **8 two-week sprints** (~16 calendar weeks). Compresses to 6 if execution
 
 ---
 
+## Status (2026-05-08)
+
+| Sprint | Status | Notes |
+|---|---|---|
+| 0 — Foundations | ✅ Shipped | Handoff brief + system audit + roadmap + 16-route baseline screenshots |
+| 1 — Design lock | ✅ Shipped (combined w/ S2/S3) | Token contract committed, Sweep mark chosen |
+| 2 — Tokens & primitives | ✅ Shipped (PR #1) | Semantic tokens, Sparkline, status indicators, dashboard shell |
+| 3 — Page rebuilds | ✅ Shipped across PR #1 + PR #2 | Auth, Dashboard, Monitors list/detail, Incidents list/detail, Status pages list, Settings |
+| 4 — *(rolled into S3)* | — | Monitor detail rebuilt with response chart + percentiles in PR #1's follow-up commits |
+| 5 — Differentiator #1 | ✅ Shipped (PR #2) | Incident collab UI + Acknowledge + acknowledge_incident MCP tool |
+| 6 — Differentiator #2 | ⏳ Next | Auto-branded status pages |
+| 7 — Differentiator #3 | ✅ Shipped (PR #1) | Native MCP server, 15 tools, Settings + Dashboard rails live |
+| 8 — Realtime + a11y | ⏳ Pending | WebSockets, Cmd-K real impl, WCAG AA pass |
+
+See [CHANGELOG.md](../CHANGELOG.md) for the per-PR change log.
+
 ## Sprint 0 — Foundations (DONE in current session)
 
 Phase 0 + Phase 1 deliverables already exist:
