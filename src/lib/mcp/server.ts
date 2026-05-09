@@ -440,7 +440,7 @@ export function buildMcpServer(org: Org): McpServer {
 
   server.tool(
     "add_incident_update",
-    "Append a status update to an incident. The update is published to the status page and to email subscribers.",
+    "Append an update to an incident. `kind: 'status'` (default) publishes to the public status page and email subscribers AND rolls up the incident's overall status. `kind: 'comment'` is internal-only and never publishes.",
     {
       incidentId: z.string().uuid(),
       status: z.enum([
@@ -450,8 +450,9 @@ export function buildMcpServer(org: Org): McpServer {
         "resolved",
       ]),
       message: z.string().min(1).max(2000),
+      kind: z.enum(["status", "comment"]).default("status"),
     },
-    async ({ incidentId, status, message }) => {
+    async ({ incidentId, status, message, kind }) => {
       // Confirm ownership
       const [inc] = await db
         .select({ id: incidents.id })
@@ -471,21 +472,65 @@ export function buildMcpServer(org: Org): McpServer {
           incidentId,
           status,
           message,
+          kind,
         })
         .returning();
 
-      // Roll up the incident status if it changed
-      const patch: Record<string, unknown> = {
-        status,
-        updatedAt: new Date(),
-      };
-      if (status === "resolved") patch.resolvedAt = new Date();
-      await db
-        .update(incidents)
-        .set(patch)
-        .where(eq(incidents.id, incidentId));
+      // Roll up the incident status only on status-kind updates.
+      if (kind === "status") {
+        const patch: Record<string, unknown> = {
+          status,
+          updatedAt: new Date(),
+        };
+        if (status === "resolved") patch.resolvedAt = new Date();
+        await db
+          .update(incidents)
+          .set(patch)
+          .where(eq(incidents.id, incidentId));
+      }
 
       return jsonOk(update);
+    },
+  );
+
+  server.tool(
+    "acknowledge_incident",
+    "Claim ownership of an in-flight incident. Sets `acknowledgedAt` and emits a `system` timeline entry. Idempotent — second calls return the existing acknowledgement.",
+    { id: z.string().uuid() },
+    async ({ id }) => {
+      const [inc] = await db
+        .select()
+        .from(incidents)
+        .where(
+          and(eq(incidents.id, id), eq(incidents.organizationId, orgId)),
+        )
+        .limit(1);
+      if (!inc) throw new Error(`Incident ${id} not found`);
+      if (inc.acknowledgedAt) {
+        return jsonOk({
+          id,
+          acknowledgedAt: inc.acknowledgedAt,
+          alreadyAcknowledged: true,
+        });
+      }
+
+      const now = new Date();
+      await db.transaction(async (tx) => {
+        const claimed = await tx
+          .update(incidents)
+          .set({ acknowledgedAt: now, updatedAt: now })
+          .where(and(eq(incidents.id, id), sql`${incidents.acknowledgedAt} IS NULL`))
+          .returning({ id: incidents.id });
+        if (claimed.length === 0) return;
+        await tx.insert(incidentUpdates).values({
+          incidentId: id,
+          status: inc.status,
+          message: "Incident acknowledged via MCP.",
+          kind: "system",
+        });
+      });
+
+      return jsonOk({ id, acknowledgedAt: now });
     },
   );
 

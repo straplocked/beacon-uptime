@@ -11,7 +11,7 @@ import {
   index,
   unique,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import type { FooterConfig } from "@/lib/types/footer";
 
 // ─── Enums ──────────────────────────────────────────────────────
@@ -55,6 +55,11 @@ export const incidentImpactEnum = pgEnum("incident_impact", [
   "minor",
   "major",
   "critical",
+]);
+export const incidentUpdateKindEnum = pgEnum("incident_update_kind", [
+  "status", // a status-change update (visible on the public status page)
+  "comment", // an internal-only comment (NOT pushed to subscribers)
+  "system", // an automated event (created by the worker / evaluator)
 ]);
 export const notificationTypeEnum = pgEnum("notification_type", [
   "email",
@@ -310,6 +315,12 @@ export const incidents = pgTable(
     title: text("title").notNull(),
     status: incidentStatusEnum("status").default("investigating").notNull(),
     impact: incidentImpactEnum("impact").default("none").notNull(),
+    // Sprint 5 — Diff #1: incident collaboration
+    acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+    acknowledgedByUserId: uuid("acknowledged_by_user_id").references(
+      () => users.id,
+      { onDelete: "set null" },
+    ),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -335,6 +346,18 @@ export const incidentUpdates = pgTable(
       .references(() => incidents.id, { onDelete: "cascade" }),
     status: incidentStatusEnum("status").notNull(),
     message: text("message").notNull(),
+    // Sprint 5 — Diff #1
+    kind: incidentUpdateKindEnum("kind").default("status").notNull(),
+    /** User who authored the update (null for system-generated entries). */
+    authoredByUserId: uuid("authored_by_user_id").references(
+      () => users.id,
+      { onDelete: "set null" },
+    ),
+    /** Array of user ids @-mentioned inside `message`. Length 0 if none. */
+    mentions: uuid("mentions")
+      .array()
+      .default(sql`'{}'::uuid[]`)
+      .notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

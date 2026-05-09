@@ -11,6 +11,10 @@ import { withRateLimit } from "@/lib/rate-limit";
 const addUpdateSchema = z.object({
   status: z.enum(["investigating", "identified", "monitoring", "resolved"]),
   message: z.string().min(1).max(2000),
+  /** Sprint 5: Diff #1 — message kind. `status` updates publish to subscribers; `comment` is internal-only. */
+  kind: z.enum(["status", "comment", "system"]).default("status"),
+  /** Optional: list of org-member user ids @-mentioned in the message. */
+  mentions: z.array(z.string().uuid()).default([]),
 });
 
 export async function POST(
@@ -59,24 +63,31 @@ export async function POST(
         incidentId: id,
         status: data.status,
         message: data.message,
+        kind: data.kind,
+        mentions: data.mentions,
+        // No authoredByUserId here — v1 API is org-scoped (API key auth);
+        // user attribution comes from the internal route which has session ctx.
       })
       .returning();
 
-    const incidentUpdate: Record<string, unknown> = {
-      status: data.status,
-      updatedAt: new Date(),
-    };
+    // Comments don't roll up the incident's status. Only status-kind updates do.
+    if (data.kind === "status") {
+      const incidentUpdate: Record<string, unknown> = {
+        status: data.status,
+        updatedAt: new Date(),
+      };
 
-    if (data.status === "resolved" && !incident.resolvedAt) {
-      incidentUpdate.resolvedAt = new Date();
-    } else if (data.status !== "resolved") {
-      incidentUpdate.resolvedAt = null;
+      if (data.status === "resolved" && !incident.resolvedAt) {
+        incidentUpdate.resolvedAt = new Date();
+      } else if (data.status !== "resolved") {
+        incidentUpdate.resolvedAt = null;
+      }
+
+      await tx
+        .update(incidents)
+        .set(incidentUpdate)
+        .where(eq(incidents.id, id));
     }
-
-    await tx
-      .update(incidents)
-      .set(incidentUpdate)
-      .where(eq(incidents.id, id));
 
     return update;
   });

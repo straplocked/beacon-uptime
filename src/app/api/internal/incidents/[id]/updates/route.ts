@@ -9,6 +9,10 @@ import { canEditResources } from "@/lib/auth/permissions";
 const addUpdateSchema = z.object({
   status: z.enum(["investigating", "identified", "monitoring", "resolved"]),
   message: z.string().min(1).max(2000),
+  /** Sprint 5: Diff #1 — `comment` is internal-only, `status` publishes. */
+  kind: z.enum(["status", "comment"]).default("status"),
+  /** Optional org-member uuids @-mentioned in the message. */
+  mentions: z.array(z.string().uuid()).default([]),
 });
 
 export async function POST(
@@ -59,25 +63,30 @@ export async function POST(
         incidentId: id,
         status: data.status,
         message: data.message,
+        kind: data.kind,
+        mentions: data.mentions,
+        authoredByUserId: ctx.user.id,
       })
       .returning();
 
-    // Sync parent incident status
-    const incidentUpdate: Record<string, unknown> = {
-      status: data.status,
-      updatedAt: new Date(),
-    };
+    // Comments don't sync the parent incident; only status updates do.
+    if (data.kind === "status") {
+      const incidentUpdate: Record<string, unknown> = {
+        status: data.status,
+        updatedAt: new Date(),
+      };
 
-    if (data.status === "resolved" && !incident.resolvedAt) {
-      incidentUpdate.resolvedAt = new Date();
-    } else if (data.status !== "resolved") {
-      incidentUpdate.resolvedAt = null;
+      if (data.status === "resolved" && !incident.resolvedAt) {
+        incidentUpdate.resolvedAt = new Date();
+      } else if (data.status !== "resolved") {
+        incidentUpdate.resolvedAt = null;
+      }
+
+      await tx
+        .update(incidents)
+        .set(incidentUpdate)
+        .where(eq(incidents.id, id));
     }
-
-    await tx
-      .update(incidents)
-      .set(incidentUpdate)
-      .where(eq(incidents.id, id));
 
     return update;
   });
