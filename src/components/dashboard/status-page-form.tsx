@@ -19,6 +19,7 @@ import {
 import { STATUS_THEMES, themeMeta, type StatusTheme } from "@/lib/status-themes";
 import type { FooterConfig, FooterItem, FooterSection } from "@/lib/types/footer";
 import { Plus, Trash2, Type, Copyright, ExternalLink } from "lucide-react";
+import { PaletteExtractor } from "@/components/dashboard/palette-extractor";
 
 interface MonitorOption {
   id: string;
@@ -679,6 +680,13 @@ export function StatusPageForm({
         <TabsContent value="branding">
           <Card>
             <CardContent className="pt-6 space-y-4">
+              <PaletteExtractor
+                defaultUrl={faviconUrl || customDomain || ""}
+                currentBrandColor={brandColor}
+                onApplyBrandColor={(hex) => setBrandColor(hex)}
+                onApplyTheme={(t) => setTheme(t)}
+              />
+
               <div className="space-y-2">
                 <Label>Theme</Label>
                 <p className="text-sm text-muted-foreground">
