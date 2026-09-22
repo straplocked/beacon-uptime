@@ -25,7 +25,7 @@ Total: **8 two-week sprints** (~16 calendar weeks). Compresses to 6 if execution
 | 3 — Page rebuilds | ✅ Shipped across PR #1 + PR #2 | Auth, Dashboard, Monitors list/detail, Incidents list/detail, Status pages list, Settings |
 | 4 — *(rolled into S3)* | — | Monitor detail rebuilt with response chart + percentiles in PR #1's follow-up commits |
 | 5 — Differentiator #1 | ✅ Shipped (PR #2) | Incident collab UI + Acknowledge + acknowledge_incident MCP tool |
-| 6 — Differentiator #2 | ⏳ Next | Auto-branded status pages |
+| 6 — Differentiator #2 | ✅ Shipped (PR #6) | Auto-branded status pages: favicon → palette → theme, applied to the public page; extract_status_page_palette MCP tool; SSRF-guarded fetch |
 | 7 — Differentiator #3 | ✅ Shipped (PR #1) | Native MCP server, 15 tools, Settings + Dashboard rails live |
 | 8 — Realtime + a11y | ⏳ Pending | WebSockets, Cmd-K real impl, WCAG AA pass |
 

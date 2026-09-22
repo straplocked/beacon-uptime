@@ -10,7 +10,7 @@ Open-source uptime monitoring platform with public status pages, incident manage
 - **Multi-channel alerts** -- Email (Brevo), Slack, Discord, Webhooks (HMAC-signed)
 - **Subscriber notifications** -- visitors subscribe to status page updates via email
 - **REST API** -- full v1 API with key-based auth and rate limiting
-- **MCP server** -- agent-native at `POST /api/mcp`. 15 tools (list / create / update / pause / acknowledge / etc.) for Claude Desktop, Claude Code, Cursor. See [docs/MCP.md](docs/MCP.md).
+- **MCP server** -- agent-native at `POST /api/mcp`. 16 tools (list / create / update / pause / acknowledge / brand-extract / etc.) for Claude Desktop, Claude Code, Cursor. See [docs/MCP.md](docs/MCP.md).
 - **Plan-based billing** -- Free / Pro / Team tiers via Stripe
 - **Time-series analytics** -- TimescaleDB continuous aggregates for uptime history, p50/p95/p99 percentile stats per monitor
 - **Light + dark mode** -- both treated as first-class; Linear-tight density, semantic tokens (`--status-*`, `--severity-*`, `--incident-*`)

@@ -35,7 +35,7 @@ Tokens are revocable on the same page. A revoked token fails all future `/api/mc
 
 ### Plan gating
 
-API access is gated to Pro / Team plans on the SaaS edition. The OSS edition (`BEACON_EDITION` unset or anything other than `saas`) returns API access for all plans — you'll see all 14 tools. See [`src/lib/edition.ts`](../src/lib/edition.ts).
+API access is gated to Pro / Team plans on the SaaS edition. The OSS edition (`BEACON_EDITION` unset or anything other than `saas`) returns API access for all plans — you'll see all 16 tools. See [`src/lib/edition.ts`](../src/lib/edition.ts).
 
 ### Rate limits
 
@@ -84,6 +84,7 @@ All tools act on the authenticated organization. Cross-org access is structurall
 | Tool                | Inputs | Result                                              |
 | ------------------- | ------ | --------------------------------------------------- |
 | `list_status_pages` | —      | Array of pages (id, name, slug, custom domain, theme, brand color, public). |
+| `extract_status_page_palette` | `url` (site, page, or direct image URL) | Brand color, swatches, a suggested theme, confidence, and contrast info extracted from the URL's favicon/logo. Read-only — does not modify any page. Fetched through an SSRF-guarded fetcher. |
 
 ### Tool limits
 
@@ -228,8 +229,8 @@ Things an MCP-aware agent can do that the dashboard alone can't easily script:
 ## Roadmap
 
 - **`acknowledge_incident`** ✅ landed in Sprint 5 (Differentiator #1).
+- **`extract_status_page_palette`** ✅ landed in Sprint 6 (Differentiator #2).
 - **`add_incident_update` with `kind: 'comment'`** ✅ landed in Sprint 5 — internal-only updates that don't publish to subscribers.
-- **`extract_status_page_palette`** tool lands once Sprint 6 implements palette extraction from a favicon URL (Differentiator #2).
 - **Per-tool telemetry** (last call timestamp, count) — captured for the live MCP rail.
 - **Hashed token storage** — current implementation stores the raw key on `organizations.apiKey`; a future hardening pass moves this to a `api_tokens` table with SHA-256 hashes and per-token names/scopes.
 - **Streaming** (`GET /api/mcp` with SSE) — only valuable once we add long-running tools.

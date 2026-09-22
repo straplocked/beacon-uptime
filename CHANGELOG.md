@@ -4,7 +4,40 @@
 
 ## Unreleased
 
-Nothing scheduled yet — Sprint 6 (auto-branded status pages) is queued.
+Sprint 8 (realtime + a11y) is the remaining differentiator-adjacent work.
+
+---
+
+## 2026-05-09 — Sprint 6 (Differentiator #2: Auto-Branded Status Pages)
+
+**PR #6** — `feat(status-pages): auto-branded status pages`
+**PR #5** — `fix(test): make plans tests edition-aware` (pre-req; the suite had been red since the OSS split)
+
+### Added
+
+- **Auto-brand from a website.** The status-page Branding tab gains an "Auto-brand from a website" panel: paste a site / page / image URL, and Beacon pulls the brand color from its favicon and suggests a matching theme. Click a swatch to apply the brand color; click the suggested-theme chip to apply the theme. Shows confidence and notes when the color was lightened for contrast.
+- **Brand color now recolors the public page.** Previously `brand_color` was stored but never applied — the public page was theme-only. It now overrides the theme accent (and derived bar/border tints) on `/s/[slug]`.
+- **`extract_status_page_palette`** MCP tool. Tool count: 15 → 16. Read-only; returns brand color, swatches, suggested theme, confidence, and contrast info so an agent can brand a page in one call.
+
+### How it works
+
+- **Color math** (`src/lib/color/oklch.ts`) — sRGB↔OKLab↔OKLCH, WCAG contrast, and `ensureContrast()` which nudges lightness (preserving hue/chroma) until a color is legible on a given background. Same OKLCH space as the app's design tokens.
+- **ICO decoder** (`src/lib/color/ico.ts`) — sharp can't read ICO and most favicons still are ICO; decodes embedded-PNG and classic BMP-DIB entries.
+- **Palette pipeline** (`src/lib/color/palette.ts`) — downscale → drop transparent → histogram → weighted k-means in OKLab (deterministic per image) → score by prominence×chroma×mid-lightness → pick brand + hue-distant accent → suggest theme → contrast-correct.
+- **Favicon discovery** (`src/lib/color/favicon.ts`) — a bare domain, a page (scans `<link rel=icon>`), or a direct image all resolve to icon bytes.
+
+### Security
+
+- **SSRF-guarded fetch** (`src/lib/net/safe-fetch.ts`) — the endpoint fetches a user-supplied URL server-side, so it blocks loopback / private / link-local / CGNAT / reserved v4+v6 (including v4-mapped v6), validates every DNS-resolved address, re-validates on each redirect hop, and caps timeout / body size / content-type. Verified live: it refused this deployment's own Redis, cloud metadata, and the internal docker host.
+- **CSS-injection sink closed** — `getBrandOverrideCSS` only emits for a strict `#rrggbb` and rebuilds the value from parsed channels; brand-color route schemas tightened to a hex regex.
+
+### API
+
+- `POST /api/internal/status-pages/extract-palette` — session-authed, `canEditResources`-gated, 10 req/min per org (it does outbound I/O). Persists nothing.
+
+### Tests
+
+121 new (color/ICO/SSRF/palette/override). The SSRF suite caught a real v4-mapped-IPv6 bug where `::ffff:127.0.0.1` wasn't blocked — fixed before commit. Full suite: **236 passing**.
 
 ---
 
