@@ -10,8 +10,8 @@ Sprint 8 (realtime + a11y) is the remaining differentiator-adjacent work.
 
 ## 2026-05-09 — Sprint 6 (Differentiator #2: Auto-Branded Status Pages)
 
-**PR #6** — `feat(status-pages): auto-branded status pages`
-**PR #5** — `fix(test): make plans tests edition-aware` (pre-req; the suite had been red since the OSS split)
+**PR #5** — `feat(status-pages): auto-branded status pages`
+**PR #4** — `fix(test): make plans tests edition-aware` (pre-req; the suite had been red since the OSS split)
 
 ### Added
 
