@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ActivityRail, type ActivityEntry } from "./_components/activity-rail";
 
 /** Number of tools currently registered in src/lib/mcp/server.ts. */
-const MCP_TOOL_COUNT = 15;
+const MCP_TOOL_COUNT = 16;
 import {
   IncidentBanner,
   type ActiveIncidentSummary,

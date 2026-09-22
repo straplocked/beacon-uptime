@@ -31,6 +31,7 @@ import {
   statusPages,
 } from "@/lib/db/schema";
 import { canUseApi, getMinCheckInterval, type PlanType } from "@/lib/plans";
+import { extractFromUrl } from "@/lib/color/favicon";
 
 type Org = typeof organizations.$inferSelect;
 
@@ -555,6 +556,30 @@ export function buildMcpServer(org: Org): McpServer {
         .where(eq(statusPages.organizationId, orgId))
         .orderBy(desc(statusPages.createdAt));
       return jsonOk(rows);
+    },
+  );
+
+  server.tool(
+    "extract_status_page_palette",
+    "Extract a brand palette from a website favicon or logo. Pass a site URL, page URL, or direct image URL; returns the brand color, a set of swatches, a suggested status-page theme (midnight/aurora/clean/ember/terminal), and a contrast-corrected brand color safe to use on that theme. Read-only — does not modify any status page.",
+    { url: z.string().min(1).max(2048) },
+    async ({ url }) => {
+      const result = await extractFromUrl(url);
+      return jsonOk({
+        sourceUrl: result.sourceUrl,
+        brandColor: result.brandColor,
+        rawBrandColor: result.rawBrandColor,
+        brandAdjustedForContrast: result.brandAdjustedForContrast,
+        brandContrast: result.brandContrast,
+        suggestedTheme: result.suggestedTheme,
+        confidence: result.confidence,
+        notes: result.notes,
+        swatches: result.swatches.map((s) => ({
+          hex: s.hex,
+          role: s.role,
+          population: s.population,
+        })),
+      });
     },
   );
 
