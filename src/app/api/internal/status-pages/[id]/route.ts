@@ -52,7 +52,10 @@ const updateStatusPageSchema = z.object({
   logoUrl: z.string().max(500).nullable().optional(),
   faviconUrl: z.string().max(500).nullable().optional(),
   theme: z.enum(["midnight", "aurora", "clean", "ember", "terminal"]).optional(),
-  brandColor: z.string().max(7).optional(),
+  brandColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, "Brand color must be a #rrggbb hex value")
+    .optional(),
   customCss: z.string().max(10000).nullable().optional(),
   headerText: z.string().max(500).nullable().optional(),
   footerText: z.string().max(500).nullable().optional(),

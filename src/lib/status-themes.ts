@@ -45,6 +45,46 @@ export function getThemeCSS(theme: StatusTheme): string {
     .join(";");
 }
 
+/**
+ * The schema default for `status_pages.brand_color`. A page still carrying
+ * this value has never been branded, so we leave the theme's own accent
+ * alone rather than tinting every default page teal.
+ */
+export const DEFAULT_BRAND_COLOR = "#14b8a6";
+
+/**
+ * When a status page has a real brand color (set manually or via the Sprint 6
+ * auto-brand extractor), override the theme's accent with it so the color
+ * actually shows on the public page. Returns a CSS declaration string to
+ * append after the theme block, or "" when the theme accent should stand.
+ *
+ * Security: `brandColor` originates from user input / the DB, and we're
+ * injecting into a <style> tag. We ONLY emit output for a strict #rrggbb
+ * match and build the derived values from parsed integer channels, so no
+ * attacker-controlled text ever reaches the stylesheet — this closes any
+ * CSS-injection path regardless of what's stored.
+ */
+export function getBrandOverrideCSS(brandColor: string | null | undefined): string {
+  if (!brandColor) return "";
+  const hex = brandColor.trim().toLowerCase();
+  if (hex === DEFAULT_BRAND_COLOR) return "";
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/.exec(hex);
+  if (!m) return ""; // not a clean #rrggbb → ignore, never inject
+
+  const r = parseInt(m[1], 16);
+  const g = parseInt(m[2], 16);
+  const b = parseInt(m[3], 16);
+  const rgb = `${r},${g},${b}`;
+
+  return [
+    `--sp-accent:rgb(${rgb})`,
+    `--sp-accent-subtle:rgba(${rgb},0.15)`,
+    `--sp-accent-border:rgba(${rgb},0.30)`,
+    `--sp-bar-up:rgba(${rgb},0.85)`,
+    `--sp-status-glow:0 0 8px`,
+  ].join(";");
+}
+
 const themeVars: Record<StatusTheme, Record<string, string>> = {
   midnight: {
     "--sp-bg": "oklch(0.13 0.02 260)",
