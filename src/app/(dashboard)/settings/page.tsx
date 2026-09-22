@@ -120,7 +120,7 @@ export default async function SettingsPage() {
               Point Claude Desktop, Claude Code, Cursor, or any MCP client at
               your Beacon API key to manage monitors, query uptime, and
               acknowledge incidents from chat. {ctx.organization.apiKey
-                ? "14 tools exposed."
+                ? "16 tools exposed."
                 : "Generate an API key below to enable."}
             </p>
             <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded border border-border bg-background font-mono text-[11px] overflow-hidden">

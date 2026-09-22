@@ -19,6 +19,7 @@ import { StatusPageFooter } from "@/components/status-page/footer";
 import type { FooterConfig } from "@/lib/types/footer";
 import type { DisplayStyle } from "@/lib/types/footer";
 import {
+  getBrandOverrideCSS,
   getThemeCSS,
   getThemeWrapperClass,
   isLightTheme,
@@ -74,6 +75,7 @@ export default async function PublicStatusPage({
 
   const theme = (page.theme || "midnight") as StatusTheme;
   const themeCSS = getThemeCSS(theme);
+  const brandOverrideCSS = getBrandOverrideCSS(page.brandColor);
   const wrapperClass = getThemeWrapperClass(theme);
   const light = isLightTheme(theme);
 
@@ -232,6 +234,9 @@ export default async function PublicStatusPage({
       } as React.CSSProperties}
     >
       <style>{`[data-sp-theme="${theme}"]{${themeCSS}}`}</style>
+      {brandOverrideCSS && (
+        <style>{`[data-sp-theme="${theme}"]{${brandOverrideCSS}}`}</style>
+      )}
       {page.customCss && <style>{page.customCss}</style>}
 
       {/* Ambient glow orbs (hidden on light themes) */}
