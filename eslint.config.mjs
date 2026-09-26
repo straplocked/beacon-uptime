@@ -12,6 +12,12 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Not covered by the defaults once globalIgnores replaces them, and a
+    // stale worktree under .claude/ otherwise gets linted as a second copy
+    // of the whole repo (222 of 232 problem files before this was added).
+    "node_modules/**",
+    ".claude/**",
+    "coverage/**",
   ]),
 ]);
 

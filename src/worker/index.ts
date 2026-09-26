@@ -25,8 +25,11 @@ const queryClient = postgres(databaseUrl);
 const db = drizzle(queryClient, { schema });
 
 const region = process.env.PROBE_REGION || "us-east";
+const workerConcurrency = parseInt(process.env.WORKER_CONCURRENCY || "10", 10);
+const workerRateLimit = parseInt(process.env.WORKER_RATE_LIMIT || "50", 10);
+const notificationConcurrency = parseInt(process.env.NOTIFICATION_CONCURRENCY || "5", 10);
 
-console.log(`[worker] Starting monitor check worker (region: ${region})`);
+console.log(`[worker] Starting monitor check worker (region: ${region}, concurrency: ${workerConcurrency}, rate limit: ${workerRateLimit}/sec)`);
 
 // ─── Monitor Check Worker ───────────────────────────────────────
 
@@ -135,9 +138,9 @@ const checkWorker = new Worker(
   },
   {
     connection: redis as any,
-    concurrency: 10,
+    concurrency: workerConcurrency,
     limiter: {
-      max: 50,
+      max: workerRateLimit,
       duration: 1000,
     },
   }
@@ -198,7 +201,7 @@ const notificationWorker = new Worker(
   },
   {
     connection: redis as any,
-    concurrency: 5,
+    concurrency: notificationConcurrency,
   }
 );
 

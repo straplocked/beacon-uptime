@@ -132,6 +132,44 @@ async function main() {
     console.warn("[migrate] Retention policy note:", e.message);
   }
 
+  // Step 6: Compression policy for check_results
+  console.log("[migrate] Setting up compression policy...");
+  try {
+    await db.execute(sql`
+      ALTER TABLE check_results SET (
+        timescaledb.compress,
+        timescaledb.compress_segmentby = 'monitor_id'
+      )
+    `);
+    await db.execute(
+      sql`SELECT add_compression_policy('check_results', INTERVAL '7 days', if_not_exists => TRUE)`
+    );
+    console.log("[migrate] check_results compression policy set (7 days)");
+  } catch (e: any) {
+    if (e.message?.includes("already enabled") || e.message?.includes("already exists")) {
+      console.log("[migrate] Compression already configured");
+    } else {
+      console.warn("[migrate] Compression policy note:", e.message);
+    }
+  }
+
+  // Step 7: Scheduling index for monitors
+  console.log("[migrate] Creating scheduling index...");
+  try {
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_monitors_scheduling
+      ON monitors (is_paused, last_checked_at, interval_seconds)
+      WHERE is_paused = false
+    `);
+    console.log("[migrate] Scheduling index created");
+  } catch (e: any) {
+    if (e.message?.includes("already exists")) {
+      console.log("[migrate] Scheduling index already exists");
+    } else {
+      console.warn("[migrate] Scheduling index note:", e.message);
+    }
+  }
+
   console.log("[migrate] Migration complete!");
   await migrationClient.end();
   process.exit(0);

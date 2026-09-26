@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { verifyPassword, createSession, getSessionCookieName, getSessionDurationMs } from "@/lib/auth";
+import { withRateLimit, getClientIp } from "@/lib/rate-limit";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -12,6 +13,11 @@ const loginSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 10 attempts per 15 minutes per IP
+    const ip = getClientIp(request);
+    const rateLimited = await withRateLimit(request, `login:${ip}`, 10, 900);
+    if (rateLimited) return rateLimited;
+
     const body = await request.json();
     const parsed = loginSchema.safeParse(body);
 
