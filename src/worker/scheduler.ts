@@ -130,45 +130,34 @@ async function checkHeartbeats() {
 
 // ─── Data Retention Cleanup ──────────────────────────────────
 
-const PLAN_RETENTION_DAYS: Record<string, number> = {
-  free: 7,
-  pro: 30,
-  team: 90,
-};
+const DEFAULT_RETENTION_DAYS = 365;
 
-const EDITION_IS_SAAS = process.env.BEACON_EDITION === "saas";
+function getRetentionDays(): number {
+  const parsed = parseInt(process.env.DATA_RETENTION_DAYS || "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_RETENTION_DAYS;
+}
 
 async function cleanupOldData() {
   try {
-    // Get all organizations with their plan
-    const allOrgs = await db
-      .select({ id: schema.organizations.id, plan: schema.organizations.plan })
-      .from(schema.organizations);
+    // One retention window for the whole install — Beacon is a single
+    // open-source edition with no per-plan retention tiers.
+    const retentionDays = getRetentionDays();
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - retentionDays);
 
-    let totalDeleted = 0;
+    // Scoped to monitors that still exist so orphaned rows are left alone,
+    // matching the previous per-organization behaviour.
+    const result = await db.execute(sql`
+      DELETE FROM check_results
+      WHERE monitor_id IN (SELECT id FROM monitors)
+      AND time < ${cutoff.toISOString()}::timestamptz
+    `);
 
-    for (const org of allOrgs) {
-      const retentionDays = EDITION_IS_SAAS
-        ? (PLAN_RETENTION_DAYS[org.plan] || 7)
-        : parseInt(process.env.DATA_RETENTION_DAYS || "365", 10);
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - retentionDays);
-
-      // Delete old check results for this organization's monitors
-      const result = await db.execute(sql`
-        DELETE FROM check_results
-        WHERE monitor_id IN (
-          SELECT id FROM monitors WHERE organization_id = ${org.id}
-        )
-        AND time < ${cutoff.toISOString()}::timestamptz
-      `);
-
-      const deleted = (result as any)?.rowCount || 0;
-      if (deleted > 0) totalDeleted += deleted;
-    }
-
-    if (totalDeleted > 0) {
-      console.log(`[scheduler] Data retention cleanup: deleted ${totalDeleted} old check results`);
+    const deleted = (result as any)?.rowCount || 0;
+    if (deleted > 0) {
+      console.log(
+        `[scheduler] Data retention cleanup (${retentionDays}d): deleted ${deleted} old check results`
+      );
     }
   } catch (error) {
     console.error("[scheduler] Error during data retention cleanup:", error);

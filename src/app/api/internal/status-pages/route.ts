@@ -2,14 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { statusPages, statusPageMonitors, monitors } from "@/lib/db/schema";
 import { getAuthContext } from "@/lib/auth";
-import { eq, desc, count } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
-import {
-  canAddStatusPage,
-  canUseCustomDomain,
-  canUseCustomCss,
-} from "@/lib/plans";
-import type { PlanType } from "@/lib/plans";
 import { canEditResources } from "@/lib/auth/permissions";
 
 const footerItemSchema = z.discriminatedUnion("type", [
@@ -101,35 +95,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const plan = ctx.organization.plan as PlanType;
   const data = parsed.data;
-
-  // Check plan limits
-  const [pageCount] = await db
-    .select({ count: count() })
-    .from(statusPages)
-    .where(eq(statusPages.organizationId, ctx.organization.id));
-
-  if (!canAddStatusPage(plan, pageCount.count)) {
-    return NextResponse.json(
-      { error: "Status page limit reached for your plan" },
-      { status: 403 }
-    );
-  }
-
-  if (data.customDomain && !canUseCustomDomain(plan)) {
-    return NextResponse.json(
-      { error: "Custom domains require a Pro or Team plan" },
-      { status: 403 }
-    );
-  }
-
-  if (data.customCss && !canUseCustomCss(plan)) {
-    return NextResponse.json(
-      { error: "Custom CSS requires a Pro or Team plan" },
-      { status: 403 }
-    );
-  }
 
   // Verify all monitors belong to the org
   if (data.monitors.length > 0) {

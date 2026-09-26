@@ -19,7 +19,6 @@ export async function GET() {
         id: ctx.organization.id,
         name: ctx.organization.name,
         slug: ctx.organization.slug,
-        plan: ctx.organization.plan,
       },
       role: ctx.role,
     });

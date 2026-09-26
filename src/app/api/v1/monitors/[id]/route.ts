@@ -5,8 +5,6 @@ import { getApiKeyOrg } from "@/lib/auth/api-key";
 import { eq, and, desc } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
-import { canUseApi } from "@/lib/plans";
-import type { PlanType } from "@/lib/plans";
 import { withRateLimit } from "@/lib/rate-limit";
 
 const updateMonitorSchema = z.object({
@@ -26,9 +24,6 @@ export async function GET(
   const org = await getApiKeyOrg(request);
   if (!org) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  if (!canUseApi(org.plan as PlanType)) {
-    return NextResponse.json({ error: "API access not available on your plan" }, { status: 403 });
   }
 
   const rateLimited = await withRateLimit(request, `api:${org.id}`, 60, 60);
@@ -77,9 +72,6 @@ export async function PATCH(
   const org = await getApiKeyOrg(request);
   if (!org) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  if (!canUseApi(org.plan as PlanType)) {
-    return NextResponse.json({ error: "API access not available on your plan" }, { status: 403 });
   }
 
   const rateLimited = await withRateLimit(request, `api:${org.id}`, 60, 60);
@@ -134,9 +126,6 @@ export async function DELETE(
   const org = await getApiKeyOrg(request);
   if (!org) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  if (!canUseApi(org.plan as PlanType)) {
-    return NextResponse.json({ error: "API access not available on your plan" }, { status: 403 });
   }
 
   const rateLimited = await withRateLimit(request, `api:${org.id}`, 60, 60);

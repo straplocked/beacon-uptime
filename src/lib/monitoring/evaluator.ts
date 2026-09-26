@@ -7,14 +7,10 @@ import {
   statusPageMonitors,
   statusPages,
   subscribers,
-  organizations,
   notificationChannels,
 } from "@/lib/db/schema";
 import { eq, and, isNull, ne } from "drizzle-orm";
 import { notificationQueue } from "@/lib/queue";
-import { PLAN_LIMITS } from "@/lib/plans";
-import type { PlanType } from "@/lib/plans";
-import { edition } from "@/lib/edition";
 
 type MonitorStatus = "up" | "down" | "degraded" | "paused" | "pending";
 type CheckStatus = "up" | "down" | "degraded";
@@ -145,7 +141,6 @@ async function createAutoIncident(
 
     // Notify subscribers
     await enqueueSubscriberNotifications(
-      monitor.organizationId,
       statusPageId,
       incident.id,
       incident.title,
@@ -256,24 +251,13 @@ async function enqueueNotifications(
 }
 
 async function enqueueSubscriberNotifications(
-  organizationId: string,
   statusPageId: string,
   incidentId: string,
   incidentTitle: string,
   incidentMessage: string
 ) {
-  // Check if organization's plan allows subscriber notifications
-  if (edition.enforcePlanLimits) {
-    const [org] = await db
-      .select({ plan: organizations.plan })
-      .from(organizations)
-      .where(eq(organizations.id, organizationId))
-      .limit(1);
-
-    if (!org || !PLAN_LIMITS[org.plan as PlanType]?.subscriberNotifications) {
-      return;
-    }
-  }
+  // Subscriber notifications are unconditional: Beacon is a single
+  // open-source edition with no plan gating.
 
   // Get the status page for URL building
   const [page] = await db

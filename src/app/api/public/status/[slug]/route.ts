@@ -4,11 +4,8 @@ import {
   statusPages,
   statusPageMonitors,
   monitors,
-  organizations,
 } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { PLAN_LIMITS } from "@/lib/plans";
-import type { PlanType } from "@/lib/plans";
 import { withRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function GET(
@@ -27,7 +24,6 @@ export async function GET(
       name: statusPages.name,
       slug: statusPages.slug,
       isPublic: statusPages.isPublic,
-      organizationId: statusPages.organizationId,
     })
     .from(statusPages)
     .where(eq(statusPages.slug, slug))
@@ -35,20 +31,6 @@ export async function GET(
 
   if (!page || !page.isPublic) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  // Check plan allows widget
-  const [org] = await db
-    .select({ plan: organizations.plan })
-    .from(organizations)
-    .where(eq(organizations.id, page.organizationId))
-    .limit(1);
-
-  if (!org || !PLAN_LIMITS[org.plan as PlanType]?.floatingWidget) {
-    return NextResponse.json(
-      { error: "Widget not available on this plan" },
-      { status: 403 }
-    );
   }
 
   const linkedMonitors = await db

@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { monitors } from "@/lib/db/schema";
 import { getApiKeyOrg } from "@/lib/auth/api-key";
-import { eq, desc, count } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
-import { canUseApi, canAddMonitor, getMinCheckInterval } from "@/lib/plans";
-import type { PlanType } from "@/lib/plans";
 import { withRateLimit } from "@/lib/rate-limit";
+import { clampCheckInterval } from "@/lib/monitoring/limits";
 
 const createMonitorSchema = z.object({
   name: z.string().min(1).max(100),
@@ -24,9 +23,6 @@ export async function GET(request: NextRequest) {
   const org = await getApiKeyOrg(request);
   if (!org) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  if (!canUseApi(org.plan as PlanType)) {
-    return NextResponse.json({ error: "API access not available on your plan" }, { status: 403 });
   }
 
   const rateLimited = await withRateLimit(request, `api:${org.id}`, 60, 60);
@@ -46,9 +42,6 @@ export async function POST(request: NextRequest) {
   if (!org) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!canUseApi(org.plan as PlanType)) {
-    return NextResponse.json({ error: "API access not available on your plan" }, { status: 403 });
-  }
 
   const rateLimited = await withRateLimit(request, `api:${org.id}`, 60, 60);
   if (rateLimited) return rateLimited;
@@ -63,22 +56,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const plan = org.plan as PlanType;
-  const [monitorCount] = await db
-    .select({ count: count() })
-    .from(monitors)
-    .where(eq(monitors.organizationId, org.id));
-
-  if (!canAddMonitor(plan, monitorCount.count)) {
-    return NextResponse.json(
-      { error: "Monitor limit reached for your plan" },
-      { status: 403 }
-    );
-  }
-
   const data = parsed.data;
-  const minInterval = getMinCheckInterval(plan);
-  const intervalSeconds = Math.max(data.intervalSeconds || 60, minInterval);
+  const intervalSeconds = clampCheckInterval(data.intervalSeconds || 60);
 
   let heartbeatToken: string | undefined;
   let heartbeatIntervalSeconds: number | undefined;

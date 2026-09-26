@@ -76,18 +76,28 @@ Two auth entry points, and picking the wrong one is the most common mistake:
 
 Route namespaces: `/api/internal/*` = session auth, `/api/v1/*` = API key, `/api/public/*` = unauthenticated (subscribe/confirm/status), `/api/mcp` = API key only.
 
-### OSS / SaaS edition split
+### One edition, no plan gating
 
-`src/lib/edition.ts` reads `BEACON_EDITION` and is the single switch for the whole commercial split:
+Beacon is open source only — a single, fully unlimited edition. There is no
+`src/lib/edition.ts`, no `src/lib/plans.ts`, no `PLAN_LIMITS`, no Stripe and no
+billing UI. Do not reintroduce a `can*` plan gate; if you find code reading
+`organizations.plan` to decide whether a feature is allowed, that is a bug.
 
-```ts
-edition.enforcePlanLimits   // BEACON_EDITION === "saas"
-edition.showOrgSwitcher / showBilling / showTeamManagement
-```
+Two real limits remain and are *not* plan gates:
 
-Every `can*` gate in `src/lib/plans.ts` short-circuits to `true` when `enforcePlanLimits` is false — self-hosted OSS is intentionally unlimited. The scheduler makes the same branch for retention: SaaS uses per-plan day counts, OSS uses `DATA_RETENTION_DAYS` (default 365).
+- `MIN_CHECK_INTERVAL_SECONDS` (30s) in `src/lib/monitoring/limits.ts` — an
+  operational floor protecting the 15s scheduler loop. Enforced by both
+  monitor-create routes and the MCP `create_monitor` / `update_monitor` tools
+  via `clampCheckInterval()`.
+- Rate limiting in `src/lib/rate-limit.ts` plus the MCP write ceiling — those
+  are security controls.
 
-**This is a tests trap.** Anything that touches a plan gate must mock the edition explicitly or it silently asserts against whichever default is active. See the `vi.hoisted` + `vi.mock("@/lib/edition")` pattern at the top of `src/lib/plans.test.ts` — the plans suite had been failing for exactly this reason. Cover both editions when a gate is edition-sensitive.
+Retention is one window for the whole install: `DATA_RETENTION_DAYS`
+(default 365), applied by `cleanupOldData()` in `src/worker/scheduler.ts`.
+
+Multi-tenancy is core, not premium: the org switcher and team management are
+always visible, and `organization_members` roles are enforced by
+`src/lib/auth/permissions.ts`.
 
 ### Outbound requests must go through safe-fetch
 
@@ -123,6 +133,5 @@ Color math lives in `src/lib/color/oklch.ts` (sRGB ↔ OKLab ↔ OKLCH, WCAG con
 | `docker-compose.yml` | local full stack, prebuilt image |
 | `docker-compose.dev.yml` | containerized dev with `tsx --watch` (`npm run dev:docker`) |
 | `docker-compose.prod.yml` | self-hosted prod: password-protected Redis, pg backup sidecar |
-| `docker-compose.saas.yml` | SaaS deployment, `beacon-saas-*` container names |
 
 `entrypoint.sh` runs migrations before starting the server, so container start is migration-gated. Pushing to `main` builds and pushes to GHCR (`.github/workflows/docker-publish.yml`) — there is no test/lint CI, so run `npm test` and `npm run lint` locally before pushing.

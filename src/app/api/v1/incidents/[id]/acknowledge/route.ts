@@ -12,7 +12,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getApiKeyOrg } from "@/lib/auth/api-key";
 import { db } from "@/lib/db";
 import { incidents, incidentUpdates } from "@/lib/db/schema";
-import { canUseApi, type PlanType } from "@/lib/plans";
 import { withRateLimit } from "@/lib/rate-limit";
 
 export async function POST(
@@ -22,12 +21,6 @@ export async function POST(
   const org = await getApiKeyOrg(request);
   if (!org) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  if (!canUseApi(org.plan as PlanType)) {
-    return NextResponse.json(
-      { error: "API access not available on your plan" },
-      { status: 403 },
-    );
   }
 
   const rateLimited = await withRateLimit(request, `api:${org.id}`, 60, 60);

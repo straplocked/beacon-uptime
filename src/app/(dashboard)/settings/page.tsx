@@ -2,7 +2,7 @@
  * P-SETTINGS — Settings page (visual rebuild).
  *
  * Visual spec: docs/design/handoff-2026-q2.md §12 (P-SETTINGS).
- * Sections: Profile, API keys & MCP, Members, Plan limits, Billing.
+ * Sections: Profile, Organization, API keys & MCP, Notifications, Members.
  * Each section is a card with token-driven chrome and tighter density.
  *
  * NOTE: The Notifications IA shift (subsume /notifications under Settings)
@@ -14,17 +14,12 @@ import { Bell, ExternalLink, Key, Users } from "lucide-react";
 import Link from "next/link";
 
 import { ApiKeySection } from "@/components/dashboard/api-key-section";
-import { BillingSection } from "@/components/dashboard/billing-section";
 import { getAuthContext } from "@/lib/auth";
-import { edition } from "@/lib/edition";
-import { PLAN_LIMITS, type PlanType } from "@/lib/plans";
 
 export default async function SettingsPage() {
   const ctx = await getAuthContext();
   if (!ctx) return null;
 
-  const plan = ctx.organization.plan as PlanType;
-  const limits = PLAN_LIMITS[plan];
   const baseUrl = process.env.BASE_URL ?? "http://localhost:3100";
   const mcpEndpoint = `${baseUrl.replace(/\/$/, "")}/api/mcp`;
 
@@ -52,17 +47,9 @@ export default async function SettingsPage() {
         </Section>
 
         {/* Organization */}
-        {edition.showOrgSwitcher && (
-          <Section title="Organization">
-            <KeyValueRow label="Name" value={ctx.organization.name} />
-            <KeyValueRow
-              label="Plan"
-              value={ctx.organization.plan}
-              valueClassName="capitalize"
-              valueBadge
-            />
-          </Section>
-        )}
+        <Section title="Organization">
+          <KeyValueRow label="Name" value={ctx.organization.name} />
+        </Section>
 
         {/* API keys & MCP */}
         <Section
@@ -138,10 +125,7 @@ export default async function SettingsPage() {
             </p>
           </div>
 
-          <ApiKeySection
-            hasApiKey={!!ctx.organization.apiKey}
-            canUseApi={limits.apiAccess}
-          />
+          <ApiKeySection hasApiKey={!!ctx.organization.apiKey} />
         </Section>
 
         {/* Notifications (placeholder until IA shift in Sprint 5) */}
@@ -164,52 +148,19 @@ export default async function SettingsPage() {
         </Section>
 
         {/* Members */}
-        {edition.showTeamManagement && (
-          <Section
-            title="Members"
-            subtitle={`${limits.teamMembers} member${limits.teamMembers === 1 ? "" : "s"} included on ${plan}`}
-            icon={<Users className="h-3.5 w-3.5" />}
+        <Section
+          title="Members"
+          subtitle="Unlimited members per organization"
+          icon={<Users className="h-3.5 w-3.5" />}
+        >
+          <Link
+            href="/settings/members"
+            className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md border border-border bg-card text-[12px] font-medium hover:bg-muted transition-colors"
           >
-            <Link
-              href="/settings/members"
-              className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md border border-border bg-card text-[12px] font-medium hover:bg-muted transition-colors"
-            >
-              Manage members
-              <ExternalLink className="h-3 w-3 opacity-60" />
-            </Link>
-          </Section>
-        )}
-
-        {/* Plan limits */}
-        {edition.enforcePlanLimits && (
-          <Section title="Plan limits" subtitle={`${plan} plan`}>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-[12px]">
-              <Limit label="Monitors" value={String(limits.monitors)} />
-              <Limit
-                label="Min interval"
-                value={`${limits.checkIntervalSeconds}s`}
-              />
-              <Limit label="Status pages" value={String(limits.statusPages)} />
-              <Limit
-                label="Retention"
-                value={`${limits.dataRetentionDays}d`}
-              />
-              <Limit
-                label="Custom domain"
-                value={limits.customDomain ? "Yes" : "—"}
-              />
-              <Limit label="Team members" value={String(limits.teamMembers)} />
-            </div>
-          </Section>
-        )}
-
-        {/* Billing */}
-        {edition.showBilling && (
-          <BillingSection
-            plan={ctx.organization.plan}
-            stripeCustomerId={ctx.organization.stripeCustomerId}
-          />
-        )}
+            Manage members
+            <ExternalLink className="h-3 w-3 opacity-60" />
+          </Link>
+        </Section>
       </div>
     </div>
   );
@@ -286,19 +237,6 @@ function KeyValueRow({
           {value}
         </span>
       )}
-    </div>
-  );
-}
-
-function Limit({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground font-medium">
-        {label}
-      </div>
-      <div className="font-mono tabnum text-[14px] text-foreground mt-0.5">
-        {value}
-      </div>
     </div>
   );
 }

@@ -23,12 +23,11 @@ import { useEffect, useMemo, useState } from "react";
 
 import { BeaconMark } from "@/components/brand/mark";
 import { Button } from "@/components/ui/button";
-import { edition } from "@/lib/edition";
 import { cn } from "@/lib/utils";
 
 interface DashboardShellProps {
   user: { id: string; name: string; email: string };
-  organization: { id: string; name: string; plan: string };
+  organization: { id: string; name: string };
   role: string;
   children: React.ReactNode;
 }
@@ -74,7 +73,7 @@ function currentLabel(pathname: string): string {
 export function DashboardShell({
   user,
   organization,
-  role: _role,
+  role,
   children,
 }: DashboardShellProps) {
   const pathname = usePathname();
@@ -82,7 +81,7 @@ export function DashboardShell({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [orgSwitcherOpen, setOrgSwitcherOpen] = useState(false);
   const [orgs, setOrgs] = useState<
-    Array<{ id: string; name: string; plan: string; role: string }>
+    Array<{ id: string; name: string; role: string }>
   >([]);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
 
@@ -198,53 +197,31 @@ export function DashboardShell({
 
         {/* Org pill */}
         <div className="px-3 pt-3">
-          {edition.showOrgSwitcher ? (
-            <button
-              className="w-full flex items-center gap-2 px-2.5 py-2 text-xs rounded-md border border-sidebar-border bg-card hover:bg-muted transition-colors"
-              onClick={() => setOrgSwitcherOpen(!orgSwitcherOpen)}
+          <button
+            className="w-full flex items-center gap-2 px-2.5 py-2 text-xs rounded-md border border-sidebar-border bg-card hover:bg-muted transition-colors"
+            onClick={() => setOrgSwitcherOpen(!orgSwitcherOpen)}
+          >
+            <span
+              className="flex items-center justify-center w-[18px] h-[18px] rounded text-[10px] font-bold text-primary-foreground"
+              style={{
+                background:
+                  "linear-gradient(135deg, var(--primary), oklch(0.55 0.18 260))",
+              }}
             >
-              <span
-                className="flex items-center justify-center w-[18px] h-[18px] rounded text-[10px] font-bold text-primary-foreground"
-                style={{
-                  background:
-                    "linear-gradient(135deg, var(--primary), oklch(0.55 0.18 260))",
-                }}
-              >
-                {orgInitials}
+              {orgInitials}
+            </span>
+            <span className="flex flex-col leading-[1.15] min-w-0 text-left">
+              <span className="font-medium text-[12px] truncate">
+                {organization.name}
               </span>
-              <span className="flex flex-col leading-[1.15] min-w-0 text-left">
-                <span className="font-medium text-[12px] truncate">
-                  {organization.name}
-                </span>
-                <span className="text-[10.5px] text-muted-foreground capitalize">
-                  {organization.plan} · plan
-                </span>
+              <span className="text-[10.5px] text-muted-foreground capitalize">
+                {role}
               </span>
-              <ChevronsUpDown className="ml-auto h-3 w-3 opacity-50 shrink-0" />
-            </button>
-          ) : (
-            <div className="w-full flex items-center gap-2 px-2.5 py-2 text-xs rounded-md border border-sidebar-border bg-card">
-              <span
-                className="flex items-center justify-center w-[18px] h-[18px] rounded text-[10px] font-bold text-primary-foreground"
-                style={{
-                  background:
-                    "linear-gradient(135deg, var(--primary), oklch(0.55 0.18 260))",
-                }}
-              >
-                {orgInitials}
-              </span>
-              <span className="flex flex-col leading-[1.15] min-w-0">
-                <span className="font-medium text-[12px] truncate">
-                  {organization.name}
-                </span>
-                <span className="text-[10.5px] text-muted-foreground capitalize">
-                  {organization.plan} · plan
-                </span>
-              </span>
-            </div>
-          )}
+            </span>
+            <ChevronsUpDown className="ml-auto h-3 w-3 opacity-50 shrink-0" />
+          </button>
 
-          {orgSwitcherOpen && edition.showOrgSwitcher && (
+          {orgSwitcherOpen && (
             <div className="mt-1 border border-border rounded-md bg-popover shadow-md">
               {orgs.map((org) => (
                 <button
@@ -258,20 +235,18 @@ export function DashboardShell({
                   <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
                   <span className="flex-1 text-left truncate">{org.name}</span>
                   <span className="text-[10px] text-muted-foreground capitalize">
-                    {org.plan}
+                    {org.role}
                   </span>
                 </button>
               ))}
-              {edition.showTeamManagement && (
-                <Link
-                  href="/settings/members"
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors border-t border-border"
-                  onClick={() => setOrgSwitcherOpen(false)}
-                >
-                  <Users className="h-3.5 w-3.5" />
-                  Manage team
-                </Link>
-              )}
+              <Link
+                href="/settings/members"
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors border-t border-border"
+                onClick={() => setOrgSwitcherOpen(false)}
+              >
+                <Users className="h-3.5 w-3.5" />
+                Manage team
+              </Link>
             </div>
           )}
         </div>
