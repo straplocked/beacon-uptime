@@ -58,10 +58,6 @@ const ROUTE_LABELS: Record<string, string> = {
   "/settings": "Settings",
 };
 
-function currentSection(pathname: string): NavItem | undefined {
-  return NAV.find((item) => pathname.startsWith(item.href));
-}
-
 function currentLabel(pathname: string): string {
   // Pick the longest matching prefix for nicer breadcrumbs on detail routes.
   const match = Object.keys(ROUTE_LABELS)
@@ -98,7 +94,11 @@ export function DashboardShell({
   );
   const userInitial = user.name?.[0]?.toUpperCase() ?? "?";
 
-  // Apply theme on the html root and persist.
+  // Apply theme on the html root and persist. Deliberately reads
+  // localStorage/matchMedia in an effect (not a useState lazy initializer)
+  // so the server-rendered markup and the first client render both start
+  // from the same "dark" default — reading them during render would
+  // desync SSR output from the client and trigger a hydration mismatch.
   useEffect(() => {
     const stored =
       typeof window !== "undefined"
@@ -110,6 +110,7 @@ export function DashboardShell({
       window.matchMedia("(prefers-color-scheme: dark)").matches
         ? "dark"
         : "light");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTheme(initial);
   }, []);
 
@@ -155,7 +156,6 @@ export function DashboardShell({
     router.refresh();
   }
 
-  const activeSection = currentSection(pathname);
   const breadcrumbLabel = currentLabel(pathname);
 
   return (

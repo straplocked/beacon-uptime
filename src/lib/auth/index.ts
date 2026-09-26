@@ -1,7 +1,6 @@
 import { db } from "@/lib/db";
 import { users, sessions, organizations, organizationMembers } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { sha256 } from "./crypto";
 import { cookies } from "next/headers";
 import type { MemberRole } from "./permissions";
 

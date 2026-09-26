@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { STATUS_THEMES, themeMeta, type StatusTheme } from "@/lib/status-themes";
-import type { FooterConfig, FooterItem, FooterSection } from "@/lib/types/footer";
+import type { FooterConfig, FooterItem } from "@/lib/types/footer";
 import { Plus, Trash2, Type, Copyright, ExternalLink } from "lucide-react";
 import { PaletteExtractor } from "@/components/dashboard/palette-extractor";
 
@@ -36,7 +36,7 @@ interface MonitorLink {
   displayStyle: string;
 }
 
-interface StatusPageData {
+export interface StatusPageData {
   id?: string;
   name: string;
   slug: string;
@@ -55,7 +55,7 @@ interface StatusPageData {
   isPublic: boolean;
 }
 
-interface LinkedMonitor {
+export interface LinkedMonitor {
   monitorId: string;
   displayName: string | null;
   sortOrder: number;

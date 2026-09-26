@@ -49,7 +49,6 @@ export function IncidentCard({
   status,
   impact,
   createdAt,
-  resolvedAt,
   updates,
 }: IncidentCardProps) {
   const badge = statusBadgeStyle(status);

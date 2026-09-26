@@ -216,9 +216,7 @@ describe("processCheckResult", () => {
   });
 
   it("does not enqueue when no notification channels exist", async () => {
-    let callCount = 0;
     mockDbSelect.mockImplementation(() => {
-      callCount++;
       return chainable([]); // no linked pages AND no channels
     });
 

@@ -6,7 +6,7 @@
  * Tailwind color classes. Filters live on the page via URL search params.
  */
 
-import { and, desc, eq, gte, isNull, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, or, sql, type SQL } from "drizzle-orm";
 import { AlertTriangle, ChevronRight, Plus } from "lucide-react";
 import Link from "next/link";
 
@@ -72,9 +72,10 @@ export default async function IncidentsPage({ searchParams }: PageProps) {
     sp.filter === "resolved" || sp.filter === "all" ? sp.filter : "open";
 
   // Build conditions
-  const conds: any[] = [eq(incidents.organizationId, ctx.organization.id)];
+  const conds: SQL[] = [eq(incidents.organizationId, ctx.organization.id)];
   if (filter === "open") {
-    conds.push(or(ne(incidents.status, "resolved"), isNull(incidents.resolvedAt)));
+    const openCondition = or(ne(incidents.status, "resolved"), isNull(incidents.resolvedAt));
+    if (openCondition) conds.push(openCondition);
   } else if (filter === "resolved") {
     conds.push(eq(incidents.status, "resolved"));
   }

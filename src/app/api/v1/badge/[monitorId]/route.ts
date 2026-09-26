@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { monitors, statusPageMonitors, statusPages, checkResults } from "@/lib/db/schema";
+import { monitors, statusPageMonitors, statusPages } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 

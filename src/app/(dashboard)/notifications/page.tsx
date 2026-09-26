@@ -2,9 +2,9 @@ import { db } from "@/lib/db";
 import { notificationChannels } from "@/lib/db/schema";
 import { getAuthContext } from "@/lib/auth";
 import { eq, desc } from "drizzle-orm";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Mail, MessageSquare, Webhook } from "lucide-react";
+import { Mail, MessageSquare, Webhook } from "lucide-react";
 import { AddChannelForm } from "@/components/dashboard/add-channel-form";
 
 export default async function NotificationsPage() {

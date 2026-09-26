@@ -7,6 +7,15 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function errorMessage(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  return String(e);
+}
+
+function errorCause(e: unknown): unknown {
+  return e instanceof Error ? (e as Error & { cause?: unknown }).cause : undefined;
+}
+
 async function main() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -22,9 +31,10 @@ async function main() {
     await extDb.execute(sql`CREATE EXTENSION IF NOT EXISTS timescaledb`);
     await extClient.end();
     console.log("[migrate] TimescaleDB extension enabled");
-  } catch (e: any) {
+  } catch (e: unknown) {
     // Connection reset is expected when extension loads for the first time
-    const errMsg = String(e?.message || "") + String(e?.cause?.code || "");
+    const cause = errorCause(e) as { code?: string } | undefined;
+    const errMsg = errorMessage(e) + String(cause?.code || "");
     if (errMsg.includes("ECONNRESET") || errMsg.includes("connection reset")) {
       console.log("[migrate] TimescaleDB extension triggered server reload, waiting...");
       await sleep(5000);
@@ -55,11 +65,12 @@ async function main() {
       sql`SELECT create_hypertable('check_results', 'time', if_not_exists => TRUE)`
     );
     console.log("[migrate] Hypertable created/verified");
-  } catch (e: any) {
-    if (e.message?.includes("already a hypertable")) {
+  } catch (e: unknown) {
+    const msg = errorMessage(e);
+    if (msg.includes("already a hypertable")) {
       console.log("[migrate] check_results is already a hypertable");
     } else {
-      console.warn("[migrate] Hypertable note:", e.message);
+      console.warn("[migrate] Hypertable note:", msg);
     }
   }
 
@@ -82,11 +93,12 @@ async function main() {
       GROUP BY monitor_id, bucket
     `);
     console.log("[migrate] hourly_uptime aggregate created");
-  } catch (e: any) {
-    if (e.message?.includes("already exists")) {
+  } catch (e: unknown) {
+    const msg = errorMessage(e);
+    if (msg.includes("already exists")) {
       console.log("[migrate] hourly_uptime aggregate already exists");
     } else {
-      console.warn("[migrate] Could not create hourly_uptime:", e.message);
+      console.warn("[migrate] Could not create hourly_uptime:", msg);
     }
   }
 
@@ -104,11 +116,12 @@ async function main() {
       GROUP BY monitor_id, bucket
     `);
     console.log("[migrate] daily_uptime aggregate created");
-  } catch (e: any) {
-    if (e.message?.includes("already exists")) {
+  } catch (e: unknown) {
+    const msg = errorMessage(e);
+    if (msg.includes("already exists")) {
       console.log("[migrate] daily_uptime aggregate already exists");
     } else {
-      console.warn("[migrate] Could not create daily_uptime:", e.message);
+      console.warn("[migrate] Could not create daily_uptime:", msg);
     }
   }
 
@@ -119,8 +132,8 @@ async function main() {
       sql`SELECT add_retention_policy('check_results', INTERVAL '30 days', if_not_exists => TRUE)`
     );
     console.log("[migrate] check_results retention policy set (30 days)");
-  } catch (e: any) {
-    console.warn("[migrate] Retention policy note:", e.message);
+  } catch (e: unknown) {
+    console.warn("[migrate] Retention policy note:", errorMessage(e));
   }
 
   try {
@@ -128,8 +141,8 @@ async function main() {
       sql`SELECT add_retention_policy('hourly_uptime', INTERVAL '1 year', if_not_exists => TRUE)`
     );
     console.log("[migrate] hourly_uptime retention policy set (1 year)");
-  } catch (e: any) {
-    console.warn("[migrate] Retention policy note:", e.message);
+  } catch (e: unknown) {
+    console.warn("[migrate] Retention policy note:", errorMessage(e));
   }
 
   // Step 6: Compression policy for check_results
@@ -145,11 +158,12 @@ async function main() {
       sql`SELECT add_compression_policy('check_results', INTERVAL '7 days', if_not_exists => TRUE)`
     );
     console.log("[migrate] check_results compression policy set (7 days)");
-  } catch (e: any) {
-    if (e.message?.includes("already enabled") || e.message?.includes("already exists")) {
+  } catch (e: unknown) {
+    const msg = errorMessage(e);
+    if (msg.includes("already enabled") || msg.includes("already exists")) {
       console.log("[migrate] Compression already configured");
     } else {
-      console.warn("[migrate] Compression policy note:", e.message);
+      console.warn("[migrate] Compression policy note:", msg);
     }
   }
 
@@ -162,11 +176,12 @@ async function main() {
       WHERE is_paused = false
     `);
     console.log("[migrate] Scheduling index created");
-  } catch (e: any) {
-    if (e.message?.includes("already exists")) {
+  } catch (e: unknown) {
+    const msg = errorMessage(e);
+    if (msg.includes("already exists")) {
       console.log("[migrate] Scheduling index already exists");
     } else {
-      console.warn("[migrate] Scheduling index note:", e.message);
+      console.warn("[migrate] Scheduling index note:", msg);
     }
   }
 

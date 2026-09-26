@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { ChevronDown, Filter, Plus } from "lucide-react";
 import Link from "next/link";
 
@@ -432,13 +432,9 @@ export default async function DashboardPage() {
       ago: relAgo(u.createdAt),
     });
   }
-  // Trim to 6 newest
-  const activitySorted = activity
-    .sort((a, b) => {
-      // crude: parse the ago string back roughly. Comparing recency by id ordering of upstream sort is fine.
-      return 0;
-    })
-    .slice(0, 6);
+  // Trim to 6 newest. Entries are already assembled in recency order
+  // upstream, so no further sort is needed here.
+  const activitySorted = activity.slice(0, 6);
 
   // 9. Compose monitor rows for the table
   const monitorRows: MonitorRow[] = orgMonitors.map((m) => {

@@ -46,7 +46,6 @@ import {
   monitors,
   notificationChannels,
   statusPageMonitors,
-  statusPages,
 } from "@/lib/db/schema";
 
 function toMonitorStatus(s: string): MonitorStatus {
