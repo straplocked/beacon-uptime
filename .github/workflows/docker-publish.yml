@@ -41,9 +41,17 @@ jobs:
             type=sha
 
       - name: Build and push
+        env:
+          # docker/metadata-action's `tags` output is newline-separated.
+          # Passing it through an env var (rather than interpolating
+          # ${{ steps.meta.outputs.tags }} directly into the script) avoids
+          # GitHub Actions splicing that multi-line value into the run
+          # script as literal text, which breaks `for tag in ...; do`
+          # syntax whenever there's more than one tag.
+          TAGS: ${{ steps.meta.outputs.tags }}
         run: |
           docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:build .
-          for tag in ${{ steps.meta.outputs.tags }}; do
-            docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:build "$tag"
-          done
+          while IFS= read -r tag; do
+            [ -n "$tag" ] && docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:build "$tag"
+          done <<< "$TAGS"
           docker push --all-tags ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
