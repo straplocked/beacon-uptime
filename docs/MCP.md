@@ -33,9 +33,9 @@ Implementation: [`src/app/api/mcp/route.ts`](../src/app/api/mcp/route.ts) using 
 
 Tokens are revocable on the same page. A revoked token fails all future `/api/mcp` calls with `401`.
 
-### Plan gating
+### No plan gating
 
-API access is gated to Pro / Team plans on the SaaS edition. The OSS edition (`BEACON_EDITION` unset or anything other than `saas`) returns API access for all plans — you'll see all 16 tools. See [`src/lib/edition.ts`](../src/lib/edition.ts).
+Beacon is a single, fully unlimited edition — every organization gets all 16 tools with no per-plan restriction. The only hard limit is the 30-second minimum check interval (`MIN_CHECK_INTERVAL_SECONDS` in [`src/lib/monitoring/limits.ts`](../src/lib/monitoring/limits.ts)), enforced by `create_monitor` / `update_monitor`.
 
 ### Rate limits
 

@@ -20,10 +20,6 @@ services:
       - SESSION_SECRET=dev-secret-change-me-in-production-1234567890abcdef
       - BREVO_API_KEY=${BREVO_API_KEY:-}
       - FROM_EMAIL=alerts@pluginsynthesis.com
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
-      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
-      - STRIPE_PRO_PRICE_ID=${STRIPE_PRO_PRICE_ID:-}
-      - STRIPE_TEAM_PRICE_ID=${STRIPE_TEAM_PRICE_ID:-}
       - PROBE_REGION=us-east
     depends_on:
       db:

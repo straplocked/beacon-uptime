@@ -4,7 +4,7 @@ Base URL: `https://beacon.pluginsynthesis.com/api`
 
 ## Authentication
 
-All v1 endpoints require an API key (Pro and Team plans only). Generate one from **Dashboard > Settings**.
+All v1 endpoints require an API key. Generate one from **Dashboard > Settings**.
 
 ```
 Authorization: Bearer bk_your_api_key_here
@@ -62,7 +62,7 @@ POST /api/v1/monitors
 | `name` | string | Yes | -- | Monitor name (1-100 chars) |
 | `type` | string | Yes | -- | `http`, `ping`, `tcp`, `dns`, `ssl`, or `heartbeat` |
 | `target` | string | Yes | -- | URL, hostname, or `host:port` |
-| `intervalSeconds` | number | No | 60 | Check interval (min 30, enforced to plan minimum) |
+| `intervalSeconds` | number | No | 60 | Check interval (min 30s, enforced by `clampCheckInterval()`) |
 | `timeoutMs` | number | No | 10000 | Timeout in ms (1000-60000) |
 | `expectedStatusCode` | number | No | 200 | Expected HTTP status code |
 | `method` | string | No | `GET` | HTTP method: `GET`, `POST`, or `HEAD` |
@@ -481,7 +481,7 @@ All errors follow this format:
 |--------|---------|
 | 400 | Validation error (check request body) |
 | 401 | Missing or invalid API key |
-| 403 | Plan doesn't allow this action |
+| 403 | Role doesn't allow this action |
 | 404 | Resource not found |
 | 429 | Rate limit exceeded (check `Retry-After` header) |
 | 500 | Server error |

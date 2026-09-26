@@ -42,7 +42,7 @@ Beacon Uptime runs as three cooperating processes backed by PostgreSQL (with Tim
 
 Serves three distinct interfaces:
 
-1. **Dashboard** (`/api/internal/*`, `/(dashboard)/*`) -- session-authenticated UI for managing monitors, incidents, status pages, notifications, and billing. Uses `getCurrentUser()` from cookie-based sessions.
+1. **Dashboard** (`/api/internal/*`, `/(dashboard)/*`) -- session-authenticated UI for managing monitors, incidents, status pages, notifications, and organization settings. Uses `getCurrentUser()` from cookie-based sessions.
 
 2. **Public Status Pages** (`/s/[slug]/*`) -- server-rendered pages showing monitor status, uptime history, and incidents. Supports custom domains, branding, and subscriber notifications.
 
@@ -160,7 +160,7 @@ users
 - Format: `bk_` + 64-character hex
 - Stored in `users.apiKey` (unique index)
 - Passed as Bearer token
-- Only available on Pro and Team plans
+- Available to every organization -- there is one edition and no plan gating
 
 ## Queue Architecture
 
@@ -200,16 +200,16 @@ When a monitor's status changes, notifications are dispatched to all of the user
 | Discord | Webhook | Embed with fields |
 | Webhook | HTTP POST | JSON payload with HMAC-SHA256 signature |
 
-Subscriber notifications (incident emails to status page subscribers) are a separate path, triggered only on auto-incident creation and gated by plan.
+Subscriber notifications (incident emails to status page subscribers) are a separate path, triggered only on auto-incident creation. There is no plan gate on this path.
 
-## Plan Enforcement
+## Limits
 
-Plan limits are checked at multiple layers:
+Beacon is a single, fully unlimited open-source edition -- there are no plan gates. Two real operational limits remain:
 
-- **API routes**: `canAddMonitor()`, `canUseApi()`, `getMinCheckInterval()`
-- **Evaluator**: `subscriberNotifications` flag gates subscriber emails
-- **Public endpoints**: `floatingWidget` flag gates widget data
-- **Scheduler**: retention days per plan for cleanup
+- **`MIN_CHECK_INTERVAL_SECONDS`** (30s, `src/lib/monitoring/limits.ts`) -- protects the 15s scheduler loop. Enforced by the monitor-create/update routes and the MCP `create_monitor` / `update_monitor` tools via `clampCheckInterval()`.
+- **Rate limiting** (`src/lib/rate-limit.ts`) -- a Redis sliding-window limiter on `/api/v1/*` and `/api/mcp`, plus an extra write ceiling on MCP. This is a security control, not a plan gate.
+
+Retention is one window for the whole install: `DATA_RETENTION_DAYS` (default 365), applied by `cleanupOldData()` in the scheduler.
 
 ## Deployment
 

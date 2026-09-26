@@ -11,7 +11,7 @@ Open-source uptime monitoring platform with public status pages, incident manage
 - **Subscriber notifications** -- visitors subscribe to status page updates via email
 - **REST API** -- full v1 API with key-based auth and rate limiting
 - **MCP server** -- agent-native at `POST /api/mcp`. 16 tools (list / create / update / pause / acknowledge / brand-extract / etc.) for Claude Desktop, Claude Code, Cursor. See [docs/MCP.md](docs/MCP.md).
-- **Plan-based billing** -- Free / Pro / Team tiers via Stripe
+- **Multi-tenant by default** -- organizations, roles (owner/admin/member/viewer), and an org switcher are core, not a paid tier
 - **Time-series analytics** -- TimescaleDB continuous aggregates for uptime history, p50/p95/p99 percentile stats per monitor
 - **Light + dark mode** -- both treated as first-class; Linear-tight density, semantic tokens (`--status-*`, `--severity-*`, `--incident-*`)
 
@@ -24,7 +24,6 @@ Open-source uptime monitoring platform with public status pages, incident manage
 | ORM | Drizzle ORM |
 | Queue | BullMQ + Redis 7 |
 | Styling | Tailwind CSS 4 + shadcn/ui |
-| Payments | Stripe |
 | Email | Brevo (Sendinblue) |
 | Charts | Recharts |
 | Validation | Zod 4 |
@@ -115,10 +114,7 @@ Open [http://localhost:3000](http://localhost:3000). Demo login: `demo@beacon.lo
 | `BASE_URL` | Yes | Public URL (used in emails, status page links) |
 | `BREVO_API_KEY` | For email | Brevo (Sendinblue) API key |
 | `FROM_EMAIL` | For email | Sender email address |
-| `STRIPE_SECRET_KEY` | For billing | Stripe secret key |
-| `STRIPE_WEBHOOK_SECRET` | For billing | Stripe webhook signing secret |
-| `STRIPE_PRO_PRICE_ID` | For billing | Stripe price ID for Pro plan |
-| `STRIPE_TEAM_PRICE_ID` | For billing | Stripe price ID for Team plan |
+| `DATA_RETENTION_DAYS` | No | Days of raw check results kept before cleanup (default: `365`) |
 | `PROBE_REGION` | No | Region identifier for check results (default: `us-east`) |
 
 ## Project Structure
@@ -133,7 +129,6 @@ src/
       internal/          # Dashboard API (session auth)
       v1/                # Public API (API key auth)
       public/            # Unauthenticated endpoints (subscribe, confirm, status)
-      webhooks/          # Stripe webhook
     s/[slug]/            # Public status pages
   components/
     ui/                  # shadcn/ui primitives
@@ -148,8 +143,8 @@ src/
       evaluator.ts       # Status transitions, auto-incidents, notification dispatch
     notifications/       # Email, Slack, Discord, Webhook, Subscriber email
     queue/               # BullMQ queue definitions
-    stripe/              # Stripe client
-    plans.ts             # Plan limits and feature gates
+    monitoring/
+      limits.ts          # MIN_CHECK_INTERVAL_SECONDS operational floor (not a plan gate)
     rate-limit.ts        # Redis sliding-window rate limiter
   worker/
     index.ts             # BullMQ workers (monitor checks + notifications)
@@ -167,7 +162,7 @@ public/
 
 | Table | Description |
 |-------|-------------|
-| `users` | Accounts with email/password auth, plan tier, Stripe IDs, API key |
+| `users` | Accounts with email/password auth |
 | `sessions` | Cookie-based sessions (30-day expiry) |
 | `monitors` | Monitor definitions (type, target, interval, thresholds) |
 | `check_results` | TimescaleDB hypertable -- time-series check data |
@@ -185,11 +180,7 @@ public/
 
 ### Data Retention
 
-| Plan | Raw Checks | Aggregates |
-|------|-----------|------------|
-| Free | 7 days | 1 year |
-| Pro | 30 days | 1 year |
-| Team | 90 days | 1 year |
+One retention window for the whole install: `DATA_RETENTION_DAYS` (default 365) for raw check results, applied by `cleanupOldData()` in the scheduler. Continuous aggregates (`hourly_uptime`, `daily_uptime`) are not pruned.
 
 ## Monitor Types
 
@@ -226,25 +217,9 @@ Create monitor (pending)
     +---> Scheduler re-enqueues every intervalSeconds
 ```
 
-## Plans
-
-| Feature | Free | Pro | Team |
-|---------|------|-----|------|
-| Monitors | 3 | 25 | 100 |
-| Min check interval | 5 min | 1 min | 30 sec |
-| Status pages | 1 | 3 | 10 |
-| Notification channels | 1 | Unlimited | Unlimited |
-| Data retention | 7 days | 30 days | 90 days |
-| API access | -- | Yes | Yes |
-| Custom domains | -- | Yes | Yes |
-| Custom CSS | -- | Yes | Yes |
-| Subscriber notifications | -- | Yes | Yes |
-| Embeddable widget | -- | Yes | Yes |
-| Team members | -- | -- | 5 |
-
 ## API Reference
 
-All v1 endpoints require a Bearer token (`Authorization: Bearer bk_...`). Generate an API key from Dashboard > Settings.
+All v1 endpoints require a Bearer token (`Authorization: Bearer bk_...`). Generate an API key from Dashboard > Settings. There is one edition: every feature above (unlimited monitors, status pages, API access, custom domains, subscriber notifications) is available to every self-hosted install. The only hard limit is a 30-second minimum check interval, enforced by `src/lib/monitoring/limits.ts` to protect the scheduler loop.
 
 ### Monitors
 
