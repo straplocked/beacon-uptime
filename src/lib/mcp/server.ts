@@ -30,7 +30,7 @@ import {
   organizations,
   statusPages,
 } from "@/lib/db/schema";
-import { canUseApi, getMinCheckInterval, type PlanType } from "@/lib/plans";
+import { clampCheckInterval } from "@/lib/monitoring/limits";
 import { extractFromUrl } from "@/lib/color/favicon";
 
 type Org = typeof organizations.$inferSelect;
@@ -52,23 +52,6 @@ export function buildMcpServer(org: Org): McpServer {
   });
 
   const orgId = org.id;
-  const plan = org.plan as PlanType;
-
-  // Soft plan gate. In OSS edition canUseApi always returns true.
-  if (!canUseApi(plan)) {
-    // Register a single error-style tool so the LLM gets a clear message.
-    server.tool(
-      "list_monitors",
-      "API access is not available on the current plan.",
-      {},
-      async () => {
-        throw new Error(
-          "API access is not available on your plan. Upgrade to Pro or Team.",
-        );
-      },
-    );
-    return server;
-  }
 
   /* ─── Monitors ─────────────────────────────── */
 
@@ -125,8 +108,7 @@ export function buildMcpServer(org: Org): McpServer {
     "Create a new monitor. The `type` determines the target format: HTTP/SSL want a URL, TCP wants host:port, DNS/Ping want a hostname or IP. For heartbeat monitors, a token is generated and returned.",
     createMonitorSchema,
     async (args) => {
-      const minInterval = getMinCheckInterval(plan);
-      const intervalSeconds = Math.max(args.intervalSeconds ?? 60, minInterval);
+      const intervalSeconds = clampCheckInterval(args.intervalSeconds ?? 60);
       let heartbeatToken: string | undefined;
       let heartbeatIntervalSeconds: number | undefined;
       if (args.type === "heartbeat") {
@@ -166,12 +148,10 @@ export function buildMcpServer(org: Org): McpServer {
       method: z.enum(["GET", "POST", "HEAD"]).optional(),
     },
     async ({ id, ...updates }) => {
-      const minInterval = getMinCheckInterval(plan);
       const finalUpdates: Record<string, unknown> = { ...updates };
       if (typeof finalUpdates.intervalSeconds === "number") {
-        finalUpdates.intervalSeconds = Math.max(
+        finalUpdates.intervalSeconds = clampCheckInterval(
           finalUpdates.intervalSeconds as number,
-          minInterval,
         );
       }
       const [m] = await db

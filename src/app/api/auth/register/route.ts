@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     const sessionId = await createSession(user.id);
 
     const response = NextResponse.json(
-      { user: { id: user.id, email: user.email, name: user.name }, organization: { id: org.id, plan: org.plan } },
+      { user: { id: user.id, email: user.email, name: user.name }, organization: { id: org.id, name: org.name, slug: org.slug } },
       { status: 201 }
     );
 

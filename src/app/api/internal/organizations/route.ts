@@ -22,7 +22,9 @@ export async function GET() {
 
   const memberships = await db
     .select({
-      organization: organizations,
+      id: organizations.id,
+      name: organizations.name,
+      slug: organizations.slug,
       role: organizationMembers.role,
     })
     .from(organizationMembers)
@@ -30,10 +32,7 @@ export async function GET() {
     .where(eq(organizationMembers.userId, user.id));
 
   return NextResponse.json({
-    organizations: memberships.map((m) => ({
-      ...m.organization,
-      role: m.role,
-    })),
+    organizations: memberships,
   });
 }
 
@@ -80,5 +79,8 @@ export async function POST(request: NextRequest) {
     role: "owner",
   });
 
-  return NextResponse.json({ organization: { ...org, role: "owner" } }, { status: 201 });
+  return NextResponse.json(
+    { organization: { id: org.id, name: org.name, slug: org.slug, role: "owner" } },
+    { status: 201 }
+  );
 }

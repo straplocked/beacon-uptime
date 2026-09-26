@@ -16,7 +16,7 @@ export default async function DashboardLayout({
   return (
     <DashboardShell
       user={{ id: ctx.user.id, name: ctx.user.name, email: ctx.user.email }}
-      organization={{ id: ctx.organization.id, name: ctx.organization.name, plan: ctx.organization.plan }}
+      organization={{ id: ctx.organization.id, name: ctx.organization.name }}
       role={ctx.role}
     >
       {children}

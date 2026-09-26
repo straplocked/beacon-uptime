@@ -11,7 +11,3 @@ export function canEditResources(role: MemberRole): boolean {
 export function canDeleteOrg(role: MemberRole): boolean {
   return role === "owner";
 }
-
-export function canManageBilling(role: MemberRole): boolean {
-  return role === "owner";
-}

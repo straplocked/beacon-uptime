@@ -7,10 +7,9 @@ import { Input } from "@/components/ui/input";
 
 interface ApiKeySectionProps {
   hasApiKey: boolean;
-  canUseApi: boolean;
 }
 
-export function ApiKeySection({ hasApiKey, canUseApi }: ApiKeySectionProps) {
+export function ApiKeySection({ hasApiKey }: ApiKeySectionProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [newKey, setNewKey] = useState<string | null>(null);
@@ -89,11 +88,7 @@ export function ApiKeySection({ hasApiKey, canUseApi }: ApiKeySectionProps) {
           </div>
         )}
 
-        {!canUseApi ? (
-          <p className="text-sm text-muted-foreground">
-            API access requires a Pro or Team plan.
-          </p>
-        ) : newKey ? (
+        {newKey ? (
           <div className="space-y-3">
             <div className="bg-muted p-3 rounded-md">
               <p className="text-xs text-muted-foreground mb-1">

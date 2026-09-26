@@ -1,14 +1,26 @@
 /**
  * P-SETTINGS subroute — Members.
  *
- * In the OSS edition this is an upgrade-prompt placeholder. The real
- * team-management UI restores in the SaaS overlay (premium edition)
- * once the multi-user routes are wired back per the OSS/SaaS split
- * documented in src/lib/edition.ts.
+ * Multi-tenancy is core to Beacon: every monitor, status page, incident and
+ * notification channel hangs off `organization_id`, and the owner/admin/
+ * member/viewer roles in `organization_members` are enforced server-side by
+ * src/lib/auth/permissions.ts.
+ *
+ * What does NOT exist yet is the invite/management UI — there are no
+ * /api/internal/members routes. Until those land, memberships are created
+ * directly in the database. This page says exactly that rather than pointing
+ * at a paid tier.
  */
 
 import { ChevronRight, Users } from "lucide-react";
 import Link from "next/link";
+
+const ROLES: Array<{ name: string; description: string }> = [
+  { name: "Owner", description: "Full access, including deleting the organization." },
+  { name: "Admin", description: "Manage members, monitors, status pages and incidents." },
+  { name: "Member", description: "Create and edit monitors, status pages and incidents." },
+  { name: "Viewer", description: "Read-only access to the dashboard." },
+];
 
 export default function MembersPage() {
   return (
@@ -32,11 +44,11 @@ export default function MembersPage() {
           Team members
         </h1>
         <p className="text-muted-foreground text-[13px] mt-1">
-          Invite teammates and manage their access
+          Roles and access for this organization
         </p>
       </div>
 
-      <section className="bg-card border border-border rounded-lg p-6 text-center">
+      <section className="bg-card border border-border rounded-lg p-6">
         <div
           className="inline-flex items-center justify-center w-10 h-10 rounded-md mb-3"
           style={{
@@ -48,21 +60,27 @@ export default function MembersPage() {
           <Users className="h-5 w-5" />
         </div>
         <h2 className="m-0 mb-1 text-[15px] font-semibold tracking-[-0.005em]">
-          Available on Beacon Cloud
+          Invite UI not built yet
         </h2>
-        <p className="text-[12.5px] text-muted-foreground mx-auto max-w-[420px] mb-4">
-          Team management with invitations, role-based access control, and
-          per-member API keys is available in the SaaS edition.
+        <p className="text-[12.5px] text-muted-foreground max-w-[460px] mb-4">
+          Organizations support unlimited members and Beacon already enforces
+          the four roles below on every request. The invitation and member
+          listing screens are still to be built, so for now memberships are
+          added directly in the <code className="font-mono">organization_members</code>{" "}
+          table.
         </p>
-        <a
-          href="https://beacon.pluginsynthesis.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md bg-primary text-primary-foreground text-[12.5px] font-medium border border-transparent hover:opacity-95 transition-opacity"
-        >
-          Visit Beacon Cloud
-          <ChevronRight className="h-3 w-3" />
-        </a>
+
+        <ul className="m-0 p-0 list-none flex flex-col gap-2">
+          {ROLES.map((r) => (
+            <li
+              key={r.name}
+              className="flex items-baseline gap-2 text-[12.5px] border-t border-border pt-2 first:border-t-0 first:pt-0"
+            >
+              <span className="font-medium min-w-[64px]">{r.name}</span>
+              <span className="text-muted-foreground">{r.description}</span>
+            </li>
+          ))}
+        </ul>
       </section>
     </div>
   );

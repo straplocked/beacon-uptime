@@ -8,8 +8,6 @@ import {
 import { getAuthContext } from "@/lib/auth";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
-import { canUseCustomDomain, canUseCustomCss } from "@/lib/plans";
-import type { PlanType } from "@/lib/plans";
 import { canEditResources } from "@/lib/auth/permissions";
 
 const footerItemSchema = z.discriminatedUnion("type", [
@@ -125,7 +123,6 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const plan = ctx.organization.plan as PlanType;
 
   const [existing] = await db
     .select()
@@ -151,20 +148,6 @@ export async function PATCH(
   }
 
   const data = parsed.data;
-
-  if (data.customDomain && !canUseCustomDomain(plan)) {
-    return NextResponse.json(
-      { error: "Custom domains require a Pro or Team plan" },
-      { status: 403 }
-    );
-  }
-
-  if (data.customCss && !canUseCustomCss(plan)) {
-    return NextResponse.json(
-      { error: "Custom CSS requires a Pro or Team plan" },
-      { status: 403 }
-    );
-  }
 
   // Verify monitors belong to org if provided
   if (data.monitors && data.monitors.length > 0) {

@@ -5,8 +5,6 @@ import { getAuthContext } from "@/lib/auth";
 import { canEditResources } from "@/lib/auth/permissions";
 import { generateApiKey } from "@/lib/auth/api-key";
 import { eq } from "drizzle-orm";
-import { canUseApi } from "@/lib/plans";
-import type { PlanType } from "@/lib/plans";
 
 export async function POST() {
   const ctx = await getAuthContext();
@@ -17,13 +15,6 @@ export async function POST() {
   if (!canEditResources(ctx.role)) {
     return NextResponse.json(
       { error: "Insufficient permissions to manage API keys" },
-      { status: 403 }
-    );
-  }
-
-  if (!canUseApi(ctx.organization.plan as PlanType)) {
-    return NextResponse.json(
-      { error: "API access requires a Pro or Team plan" },
       { status: 403 }
     );
   }

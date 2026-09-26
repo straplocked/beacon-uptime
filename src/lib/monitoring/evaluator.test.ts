@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock all external dependencies before importing the module
 const mockDbInsert = vi.fn();
@@ -55,13 +55,7 @@ vi.mock("@/lib/queue", () => ({
   },
 }));
 
-vi.mock("@/lib/plans", () => ({
-  PLAN_LIMITS: {
-    free: { subscriberNotifications: false },
-    pro: { subscriberNotifications: true },
-    team: { subscriberNotifications: true },
-  },
-}));
+import * as schema from "@/lib/db/schema";
 
 import { processCheckResult } from "./evaluator";
 
@@ -358,5 +352,143 @@ describe("notification payload", () => {
       { ...upResult, status: "degraded" }
     );
     expect(mockQueueAdd.mock.calls[0][1].payload.event).toBe("monitor.degraded");
+  });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * NAMED GUARD — subscriber notifications are unconditional.
+ *
+ * Until the OSS-only change, `enqueueSubscriberNotifications` read
+ * `organizations.plan` and silently returned when the plan lacked
+ * `subscriberNotifications` (i.e. the "free" plan). There is now one
+ * edition and no plan gating, so the subscriber-email path must be
+ * reached for an organization whose `plan` column still says "free".
+ *
+ * The `organizations` row below is deliberately still seeded with
+ * plan: "free" — if anyone re-introduces a plan gate here, these tests
+ * go red instead of quietly dropping subscriber mail.
+ * ──────────────────────────────────────────────────────────────── */
+
+/** Minimal stand-in for the drizzle select chain used by the evaluator. */
+interface SelectChainStub {
+  where: () => SelectChainStub;
+  limit: (n?: number) => Promise<unknown[]>;
+  orderBy: (...args: unknown[]) => Promise<unknown[]>;
+  then: (
+    resolve: (rows: unknown[]) => unknown,
+    reject?: (err: unknown) => unknown,
+  ) => Promise<unknown>;
+}
+
+/** db.select() mock that dispatches on the table passed to .from(). */
+function selectByTable(rowsByTable: Map<unknown, unknown[]>) {
+  return () => ({
+    from: vi.fn((table: unknown) => {
+      const rows = rowsByTable.get(table) ?? [];
+      const sub: SelectChainStub = {
+        where: () => sub,
+        limit: () => Promise.resolve(rows),
+        orderBy: () => Promise.resolve(rows),
+        then: (resolve, reject) => Promise.resolve(rows).then(resolve, reject),
+      };
+      return sub;
+    }),
+  });
+}
+
+describe("subscriber notifications (no plan gating)", () => {
+  const originalBaseUrl = process.env.BASE_URL;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupDefaultMocks();
+    process.env.BASE_URL = "https://status.example.test";
+
+    mockDbSelect.mockImplementation(
+      selectByTable(
+        new Map<unknown, unknown[]>([
+          // The monitor is on one status page, so an auto-incident is created.
+          [schema.statusPageMonitors, [{ statusPageId: "page-1" }]],
+          // No open incident on that page yet.
+          [schema.incidents, []],
+          [schema.statusPages, [{ slug: "acme", name: "Acme Status" }]],
+          [
+            schema.subscribers,
+            [
+              {
+                id: "sub-1",
+                email: "watcher@example.test",
+                confirmationToken: "tok-abc",
+              },
+            ],
+          ],
+          // The org is still on the plan the old code suppressed.
+          [schema.organizations, [{ plan: "free" }]],
+          // No org notification channels, so the only queued job is the
+          // subscriber email.
+          [schema.notificationChannels, []],
+        ]),
+      ),
+    );
+  });
+
+  afterEach(() => {
+    if (originalBaseUrl === undefined) delete process.env.BASE_URL;
+    else process.env.BASE_URL = originalBaseUrl;
+  });
+
+  it('enqueues a subscriber email for an organization whose plan is still "free"', async () => {
+    await processCheckResult({ ...baseMonitor, status: "up" }, downResult);
+
+    expect(mockQueueAdd).toHaveBeenCalledTimes(1);
+
+    const [jobName, jobData, opts] = mockQueueAdd.mock.calls[0];
+
+    // Assert the wrong answer first: this must NOT be an org-channel job.
+    expect(jobName).not.toBe("notify-email-ch-1");
+    expect(jobData.type).not.toBe(undefined);
+
+    // Hand-written expectations — not derived from the evaluator's own code.
+    expect(jobName).toBe("subscriber-notify-sub-1");
+    expect(jobData).toEqual({
+      type: "subscriber-notification",
+      email: "watcher@example.test",
+      pageName: "Acme Status",
+      incidentTitle: "Test is down",
+      incidentMessage: "Automated alert: Internal Server Error",
+      statusPageUrl: "https://status.example.test/s/acme",
+      unsubscribeUrl:
+        "https://status.example.test/api/public/unsubscribe/tok-abc",
+    });
+    expect(opts).toEqual({ priority: 2 });
+  });
+
+  it("never reads organizations.plan on the subscriber path", async () => {
+    await processCheckResult({ ...baseMonitor, status: "up" }, downResult);
+
+    const tablesQueried = mockDbSelect.mock.results.flatMap((r) => {
+      const stub = r.value as { from: { mock: { calls: unknown[][] } } };
+      return stub.from.mock.calls.map((call) => call[0]);
+    });
+    expect(tablesQueried).toContain(schema.subscribers);
+    expect(tablesQueried).not.toContain(schema.organizations);
+  });
+
+  it("enqueues nothing when the status page has no confirmed subscribers", async () => {
+    mockDbSelect.mockImplementation(
+      selectByTable(
+        new Map<unknown, unknown[]>([
+          [schema.statusPageMonitors, [{ statusPageId: "page-1" }]],
+          [schema.incidents, []],
+          [schema.statusPages, [{ slug: "acme", name: "Acme Status" }]],
+          [schema.subscribers, []],
+          [schema.notificationChannels, []],
+        ]),
+      ),
+    );
+
+    await processCheckResult({ ...baseMonitor, status: "up" }, downResult);
+
+    expect(mockQueueAdd).not.toHaveBeenCalled();
   });
 });

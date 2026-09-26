@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { monitors } from "@/lib/db/schema";
 import { getAuthContext } from "@/lib/auth";
-import { eq, desc, count } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
-import { canAddMonitor, getMinCheckInterval } from "@/lib/plans";
-import type { PlanType } from "@/lib/plans";
 import { monitorCheckQueue } from "@/lib/queue";
 import { canEditResources } from "@/lib/auth/permissions";
+import { clampCheckInterval } from "@/lib/monitoring/limits";
 
 const createMonitorSchema = z.object({
   name: z.string().min(1).max(100),
@@ -56,23 +55,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Check plan limits
-  const plan = ctx.organization.plan as PlanType;
-  const [monitorCount] = await db
-    .select({ count: count() })
-    .from(monitors)
-    .where(eq(monitors.organizationId, ctx.organization.id));
-
-  if (!canAddMonitor(plan, monitorCount.count)) {
-    return NextResponse.json(
-      { error: "Monitor limit reached for your plan" },
-      { status: 403 }
-    );
-  }
-
   const data = parsed.data;
-  const minInterval = getMinCheckInterval(plan);
-  const intervalSeconds = Math.max(data.intervalSeconds || 60, minInterval);
+  const intervalSeconds = clampCheckInterval(data.intervalSeconds || 60);
 
   // Generate heartbeat token if needed
   let heartbeatToken: string | undefined;
