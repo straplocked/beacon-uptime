@@ -106,28 +106,25 @@ export function MonitorTable({
   const [typeFilter, setTypeFilter] = useState<string | "all">("all");
 
   const sorted = useMemo(() => {
-    let arr = filter === "all" ? [...monitors] : monitors.filter((m) => m.status === filter);
-    if (typeFilter !== "all") {
-      arr = arr.filter((m) => m.type.toLowerCase() === typeFilter.toLowerCase());
-    }
-    if (sort.col === "status") {
-      arr.sort(
-        (a, b) =>
-          (STATUS_SORT_ORDER[a.status] ?? 99) -
-          (STATUS_SORT_ORDER[b.status] ?? 99),
-      );
-    } else if (sort.col === "name") {
-      arr.sort((a, b) => a.name.localeCompare(b.name));
-    } else if (sort.col === "response") {
-      arr.sort(
-        (a, b) =>
-          (a.lastResponseMs ?? Number.POSITIVE_INFINITY) -
-          (b.lastResponseMs ?? Number.POSITIVE_INFINITY),
-      );
-    }
-    if (sort.dir === "desc") arr.reverse();
-    return arr;
-  }, [monitors, sort, filter]);
+    const byStatus = filter === "all" ? monitors : monitors.filter((m) => m.status === filter);
+    const byType =
+      typeFilter === "all"
+        ? byStatus
+        : byStatus.filter((m) => m.type.toLowerCase() === typeFilter.toLowerCase());
+
+    const comparator: (a: MonitorRow, b: MonitorRow) => number =
+      sort.col === "status"
+        ? (a, b) => (STATUS_SORT_ORDER[a.status] ?? 99) - (STATUS_SORT_ORDER[b.status] ?? 99)
+        : sort.col === "name"
+          ? (a, b) => a.name.localeCompare(b.name)
+          : (a, b) =>
+              (a.lastResponseMs ?? Number.POSITIVE_INFINITY) -
+              (b.lastResponseMs ?? Number.POSITIVE_INFINITY);
+
+    const result = [...byType].sort(comparator);
+    if (sort.dir === "desc") result.reverse();
+    return result;
+  }, [monitors, sort, filter, typeFilter]);
 
   const toggleSort = (col: SortCol) => {
     setSort((s) =>

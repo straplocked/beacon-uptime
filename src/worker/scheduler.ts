@@ -16,6 +16,9 @@ const queryClient = postgres(databaseUrl);
 const db = drizzle(queryClient, { schema });
 
 const monitorCheckQueue = new Queue("monitor-checks", {
+  // BullMQ bundles its own ioredis types, incompatible with our shared
+  // ioredis client — see CLAUDE.md "BullMQ + ioredis".
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   connection: redis as any,
   defaultJobOptions: {
     removeOnComplete: { count: 1000 },
@@ -153,7 +156,9 @@ async function cleanupOldData() {
       AND time < ${cutoff.toISOString()}::timestamptz
     `);
 
-    const deleted = (result as any)?.rowCount || 0;
+    // postgres-js reports affected rows as `.count`, not `.rowCount`
+    // (that's the node-pg convention) — this was previously always 0.
+    const deleted = result.count || 0;
     if (deleted > 0) {
       console.log(
         `[scheduler] Data retention cleanup (${retentionDays}d): deleted ${deleted} old check results`

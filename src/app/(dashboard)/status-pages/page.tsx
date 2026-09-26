@@ -7,7 +7,7 @@
  * and quick actions to view + edit.
  */
 
-import { count, desc, eq, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { ExternalLink, Globe, Plus } from "lucide-react";
 import Link from "next/link";
 

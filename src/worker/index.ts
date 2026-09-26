@@ -137,6 +137,9 @@ const checkWorker = new Worker(
     );
   },
   {
+    // BullMQ bundles its own ioredis types, incompatible with our shared
+    // ioredis client — see CLAUDE.md "BullMQ + ioredis".
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     connection: redis as any,
     concurrency: workerConcurrency,
     limiter: {
@@ -146,7 +149,7 @@ const checkWorker = new Worker(
   }
 );
 
-checkWorker.on("completed", (job) => {
+checkWorker.on("completed", () => {
   // Quiet log for completed checks
 });
 
@@ -200,6 +203,7 @@ const notificationWorker = new Worker(
     }
   },
   {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     connection: redis as any,
     concurrency: notificationConcurrency,
   }

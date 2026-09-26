@@ -90,7 +90,6 @@ export function ComponentRow(props: ComponentRowProps) {
 function BarsRow({
   name,
   target,
-  type,
   status,
   uptimePercent,
   avgResponse,
@@ -101,7 +100,6 @@ function BarsRow({
   dailyStats,
   recentChecks,
   showUptime,
-  showResponseTime,
   days,
 }: ComponentRowProps) {
   const [expanded, setExpanded] = useState(false);
@@ -114,6 +112,10 @@ function BarsRow({
   }
 
   function timeAgo(iso: string) {
+    // Static status-page render — a one-off "time ago" label, not a live
+    // clock, so reading the current time during render is intentional
+    // rather than something that needs a ticking interval/state.
+    // eslint-disable-next-line react-hooks/purity
     const diff = Date.now() - new Date(iso).getTime();
     const s = Math.floor(diff / 1000);
     if (s < 60) return `${s}s ago`;

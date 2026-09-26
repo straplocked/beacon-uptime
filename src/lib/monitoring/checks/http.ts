@@ -53,7 +53,7 @@ export async function performHttpCheck(
     clearTimeout(timeout);
 
     // Extract TLS expiry if available (Node.js specific)
-    let tlsExpiry: Date | null = null;
+    const tlsExpiry: Date | null = null;
 
     const statusCode = response.status;
     const isExpectedStatus = statusCode === expectedStatusCode;

@@ -18,7 +18,21 @@ const eslintConfig = defineConfig([
     "node_modules/**",
     ".claude/**",
     "coverage/**",
+    // Compiled worker/scheduler/migrate bundle (npm run build:worker) — a
+    // generated build artifact, not source.
+    "dist/**",
   ]),
+  {
+    // Test files mock third-party network APIs (tls.connect, net.Socket,
+    // dns callbacks, etc.) whose real overload signatures are awkward or
+    // impossible to satisfy exactly from a vi.fn() mock. `any` here is the
+    // mock boundary, not a shortcut around real application types — see
+    // Vikunja C5.
+    files: ["**/*.test.ts", "**/*.test.tsx"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

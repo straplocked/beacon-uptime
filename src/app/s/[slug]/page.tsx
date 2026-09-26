@@ -7,16 +7,14 @@ import {
   incidents,
   incidentUpdates,
 } from "@/lib/db/schema";
-import { eq, and, desc, gte, isNull, ne } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
-import { UptimeBar } from "@/components/status-page/uptime-bar";
 import { ComponentRow } from "@/components/status-page/component-row";
 import { IncidentCard } from "@/components/status-page/incident-card";
 import { SubscribeButton } from "@/components/status-page/subscribe-button";
 import { StatusPageFooter } from "@/components/status-page/footer";
-import type { FooterConfig } from "@/lib/types/footer";
 import type { DisplayStyle } from "@/lib/types/footer";
 import {
   getBrandOverrideCSS,
@@ -26,8 +24,23 @@ import {
   type StatusTheme,
 } from "@/lib/status-themes";
 
+interface DailyStatRow {
+  day: string;
+  total: string | number;
+  up_count: string | number;
+  avg_response: string | number | null;
+}
+
+interface OverallStatRow {
+  total: string | number;
+  up_count: string | number;
+  avg_response: string | number | null;
+  min_response: string | number | null;
+  max_response: string | number | null;
+}
+
 async function getStatusPage(slug: string) {
-  let [page] = await db
+  const [page] = await db
     .select()
     .from(statusPages)
     .where(eq(statusPages.slug, slug))
@@ -125,10 +138,11 @@ export default async function PublicStatusPage({
         .orderBy(desc(checkResults.time))
         .limit(20);
 
-      const overall = overallStats[0] as any;
+      const overall = overallStats[0] as unknown as OverallStatRow | undefined;
+      const totalChecks = Number(overall?.total ?? 0);
       const uptimePercent =
-        overall?.total > 0
-          ? ((Number(overall.up_count) / Number(overall.total)) * 100).toFixed(2)
+        totalChecks > 0
+          ? ((Number(overall?.up_count ?? 0) / totalChecks) * 100).toFixed(2)
           : null;
 
       return {
@@ -145,7 +159,7 @@ export default async function PublicStatusPage({
         avgResponse: overall?.avg_response ? Number(overall.avg_response) : null,
         minResponse: overall?.min_response ? Number(overall.min_response) : null,
         maxResponse: overall?.max_response ? Number(overall.max_response) : null,
-        dailyStats: (dailyStats as any[]).map((d) => ({
+        dailyStats: (dailyStats as unknown as DailyStatRow[]).map((d) => ({
           day: d.day,
           total: Number(d.total),
           upCount: Number(d.up_count),
@@ -273,6 +287,7 @@ export default async function PublicStatusPage({
         <div className="flex items-center justify-between mb-10">
           <div className="flex items-center gap-3">
             {page.logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element -- logoUrl is an arbitrary externally-hosted URL (brand/logo extraction), not one of next/image's configured remote patterns
               <img src={page.logoUrl} alt="" className="h-8" />
             )}
             <h1
@@ -378,7 +393,7 @@ export default async function PublicStatusPage({
         <StatusPageFooter
           slug={page.slug}
           footerText={page.footerText}
-          footerConfig={(page as any).footerConfig as FooterConfig | null}
+          footerConfig={page.footerConfig}
         />
       </div>
     </div>

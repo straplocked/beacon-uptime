@@ -8,6 +8,7 @@ export const redis = new IORedis(redisUrl, {
 });
 
 // Cast needed because BullMQ bundles its own ioredis types
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const connection = redis as any;
 
 export const monitorCheckQueue = new Queue("monitor-checks", {

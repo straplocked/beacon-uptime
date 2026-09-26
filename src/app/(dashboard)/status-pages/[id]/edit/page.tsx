@@ -5,13 +5,17 @@ import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { StatusPageForm } from "@/components/dashboard/status-page-form";
+import {
+  StatusPageForm,
+  type StatusPageData,
+  type LinkedMonitor,
+} from "@/components/dashboard/status-page-form";
 
 export default function EditStatusPagePage() {
   const params = useParams<{ id: string }>();
   const [data, setData] = useState<{
-    statusPage: any;
-    monitors: any[];
+    statusPage: StatusPageData;
+    monitors: LinkedMonitor[];
   } | null>(null);
   const [loading, setLoading] = useState(true);
 
