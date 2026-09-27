@@ -86,6 +86,7 @@ To use an external Postgres or Redis instead of the embedded ones, fill in the o
           Description="Optional: a region label attached to check results — cosmetic unless you run several instances and compare regions."
           Type="Variable" Display="advanced" Required="false" Mask="false">us-east</Config>
 
+  <Config Name="ALLOW_REGISTRATION" Target="ALLOW_REGISTRATION" Default="false" Mode="" Description="Registration is open only until the first account exists; that person owns the install. Set to true to let more people sign up (anyone who can reach the URL)." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
   <Config Name="DATA_RETENTION_DAYS" Target="DATA_RETENTION_DAYS" Default="365" Mode=""
           Description="Optional: days of raw check results kept before cleanup. Hourly/daily uptime aggregates are kept for a year regardless."
           Type="Variable" Display="advanced" Required="false" Mask="false">365</Config>
