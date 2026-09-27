@@ -148,3 +148,7 @@ create-a-monitor, worker-runs-a-check, restart-and-persist) is proved
 locally with `docker run` before every push. No request has traversed a real
 reverse proxy or a real public hostname — that first end-to-end proof, once
 this is installed behind an actual proxy, is the operator's.
+
+## First login
+
+Open the public URL and register. The first account claims the install (it owns its organization); after that, registration is closed and `/api/auth/register` returns 403. To let more people sign up, set `ALLOW_REGISTRATION=true` in the template (anyone who can reach the URL can then register and create monitors from your server).

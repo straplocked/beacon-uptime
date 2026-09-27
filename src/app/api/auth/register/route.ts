@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import { users, organizations, organizationMembers } from "@/lib/db/schema";
 import { hashPassword, createSession, getSessionCookieName, getOrgCookieName, getSessionDurationMs } from "@/lib/auth";
 import { withRateLimit, getClientIp } from "@/lib/rate-limit";
-import { eq } from "drizzle-orm";
+import { isRegistrationOpen } from "@/lib/auth/registration";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 const registerSchema = z.object({
@@ -26,6 +27,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: parsed.error.issues[0].message },
         { status: 400 }
+      );
+    }
+
+    const [{ userCount }] = await db
+      .select({ userCount: sql<number>`count(*)::int` })
+      .from(users);
+    if (!isRegistrationOpen(userCount)) {
+      return NextResponse.json(
+        { error: "Registration is closed on this Beacon. Ask the owner for access." },
+        { status: 403 }
       );
     }
 
