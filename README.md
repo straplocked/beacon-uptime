@@ -1,5 +1,7 @@
 # Beacon Uptime
 
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
+
 Open-source uptime monitoring platform with public status pages, incident management, and multi-channel alerting. Built with Next.js 16, PostgreSQL + TimescaleDB, and BullMQ.
 
 ## Features
@@ -324,4 +326,6 @@ npm run db:seed       # Seed demo data
 
 ## License
 
-Private
+Beacon Uptime is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only). If you run a modified version of Beacon over a network for others to use, the AGPL (section 13) requires you to make that version's source available to those users.
+
+Contributions require signing the [Contributor License Agreement](CLA.md) — see [CONTRIBUTING.md](CONTRIBUTING.md) for details. The CLA is what keeps a future official hosted edition possible without changing your rights to your own contribution.
