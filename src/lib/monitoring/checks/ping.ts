@@ -1,4 +1,16 @@
-import { exec } from "child_process";
+import { execFile } from "child_process";
+
+/**
+ * A ping target is a hostname or an IP literal, nothing else. The target is
+ * user-supplied (API, MCP, dashboard), so it is validated and passed to ping
+ * as an argv entry, never through a shell: `exec(`ping ... ${target}`)` let a
+ * target like `1.1.1.1; <cmd>` run commands inside the container.
+ */
+const PING_TARGET = /^[A-Za-z0-9](?:[A-Za-z0-9.:-]{0,252})$/;
+
+export function isValidPingTarget(target: string): boolean {
+  return PING_TARGET.test(target);
+}
 
 export interface PingCheckOptions {
   target: string; // hostname or IP
@@ -19,10 +31,19 @@ export async function performPingCheck(
   const start = performance.now();
 
   return new Promise<CheckResult>((resolve) => {
-    // Use -c 1 for single ping, -W for timeout (Linux)
-    const command = `ping -c 1 -W ${timeoutSec} ${target}`;
+    if (!isValidPingTarget(target)) {
+      resolve({
+        status: "down",
+        responseTimeMs: 0,
+        errorMessage: "Invalid ping target: use a hostname or IP address",
+      });
+      return;
+    }
 
-    exec(command, { timeout: timeoutMs + 2000 }, (error, stdout, stderr) => {
+    // Use -c 1 for single ping, -W for timeout (Linux). argv, not a shell.
+    const args = ["-c", "1", "-W", String(timeoutSec), target];
+
+    execFile("ping", args, { timeout: timeoutMs + 2000 }, (error, stdout, stderr) => {
       const responseTimeMs = Math.round(performance.now() - start);
 
       if (error) {

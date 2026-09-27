@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { performPingCheck } from "./ping";
+import { performPingCheck, isValidPingTarget } from "./ping";
 
 vi.mock("child_process", () => ({
-  exec: vi.fn(),
+  execFile: vi.fn(),
 }));
 
-import { exec } from "child_process";
+import { execFile } from "child_process";
 
 describe("performPingCheck", () => {
   beforeEach(() => {
@@ -13,14 +13,14 @@ describe("performPingCheck", () => {
   });
 
   it("returns up on successful ping", async () => {
-    vi.mocked(exec).mockImplementation((_cmd: any, _opts: any, cb: any) => {
+    vi.mocked(execFile).mockImplementation(((_file: any, _args: any, _opts: any, cb: any) => {
       cb(
         null,
         "PING 1.1.1.1 (1.1.1.1) 56(84) bytes of data.\n64 bytes from 1.1.1.1: icmp_seq=1 ttl=57 time=4.25 ms\n",
         ""
       );
       return {} as any;
-    });
+    }) as any);
 
     const result = await performPingCheck({
       target: "1.1.1.1",
@@ -33,14 +33,14 @@ describe("performPingCheck", () => {
   });
 
   it("extracts response time from ping output", async () => {
-    vi.mocked(exec).mockImplementation((_cmd: any, _opts: any, cb: any) => {
+    vi.mocked(execFile).mockImplementation(((_file: any, _args: any, _opts: any, cb: any) => {
       cb(
         null,
         "64 bytes from 8.8.8.8: icmp_seq=1 ttl=117 time=12.8 ms",
         ""
       );
       return {} as any;
-    });
+    }) as any);
 
     const result = await performPingCheck({
       target: "8.8.8.8",
@@ -52,14 +52,14 @@ describe("performPingCheck", () => {
   });
 
   it("handles time<1 ms format", async () => {
-    vi.mocked(exec).mockImplementation((_cmd: any, _opts: any, cb: any) => {
+    vi.mocked(execFile).mockImplementation(((_file: any, _args: any, _opts: any, cb: any) => {
       cb(
         null,
         "64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 time<1 ms",
         ""
       );
       return {} as any;
-    });
+    }) as any);
 
     const result = await performPingCheck({
       target: "127.0.0.1",
@@ -72,10 +72,10 @@ describe("performPingCheck", () => {
   });
 
   it("returns down on ping failure", async () => {
-    vi.mocked(exec).mockImplementation((_cmd: any, _opts: any, cb: any) => {
+    vi.mocked(execFile).mockImplementation(((_file: any, _args: any, _opts: any, cb: any) => {
       cb(new Error("Command failed"), "", "ping: bad-host: Name or service not known");
       return {} as any;
-    });
+    }) as any);
 
     const result = await performPingCheck({
       target: "bad-host",
@@ -87,10 +87,10 @@ describe("performPingCheck", () => {
   });
 
   it("returns down with error message when stderr is empty", async () => {
-    vi.mocked(exec).mockImplementation((_cmd: any, _opts: any, cb: any) => {
+    vi.mocked(execFile).mockImplementation(((_file: any, _args: any, _opts: any, cb: any) => {
       cb(new Error("Command failed: exit code 1"), "", "");
       return {} as any;
-    });
+    }) as any);
 
     const result = await performPingCheck({
       target: "unreachable.host",
@@ -102,11 +102,11 @@ describe("performPingCheck", () => {
   });
 
   it("constructs correct ping command with timeout", async () => {
-    vi.mocked(exec).mockImplementation((cmd: any, _opts: any, cb: any) => {
-      expect(cmd).toBe("ping -c 1 -W 5 8.8.8.8");
+    vi.mocked(execFile).mockImplementation(((file: any, args: any, _opts: any, cb: any) => {
+      expect([file, ...args].join(" ")).toBe("ping -c 1 -W 5 8.8.8.8");
       cb(null, "64 bytes from 8.8.8.8: time=10.0 ms", "");
       return {} as any;
-    });
+    }) as any);
 
     await performPingCheck({
       target: "8.8.8.8",
@@ -115,15 +115,31 @@ describe("performPingCheck", () => {
   });
 
   it("rounds timeout up to nearest second", async () => {
-    vi.mocked(exec).mockImplementation((cmd: any, _opts: any, cb: any) => {
-      expect(cmd).toBe("ping -c 1 -W 3 8.8.8.8");
+    vi.mocked(execFile).mockImplementation(((file: any, args: any, _opts: any, cb: any) => {
+      expect([file, ...args].join(" ")).toBe("ping -c 1 -W 3 8.8.8.8");
       cb(null, "64 bytes from 8.8.8.8: time=10.0 ms", "");
       return {} as any;
-    });
+    }) as any);
 
     await performPingCheck({
       target: "8.8.8.8",
       timeoutMs: 2500,
     });
+  });
+
+  it("refuses shell metacharacters and option injection without running ping", async () => {
+    for (const target of ["1.1.1.1; id", "$(id)", "a`id`", "-f 1.1.1.1", "host name", ""]) {
+      expect(isValidPingTarget(target)).toBe(false);
+      vi.mocked(execFile).mockClear();
+      const result = await performPingCheck({ target, timeoutMs: 1000 });
+      expect(result.status).toBe("down");
+      expect(execFile).not.toHaveBeenCalled();
+    }
+  });
+
+  it("accepts hostnames, IPv4 and IPv6 literals", () => {
+    for (const target of ["example.com", "192.168.1.1", "2606:4700:4700::1111", "nas-01.local"]) {
+      expect(isValidPingTarget(target)).toBe(true);
+    }
   });
 });
