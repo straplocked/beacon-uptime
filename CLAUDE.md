@@ -135,3 +135,7 @@ Color math lives in `src/lib/color/oklch.ts` (sRGB ↔ OKLab ↔ OKLCH, WCAG con
 | `docker-compose.prod.yml` | self-hosted prod: password-protected Redis, pg backup sidecar |
 
 `entrypoint.sh` runs migrations before starting the server, so container start is migration-gated. Pushing to `main` builds and pushes to GHCR (`.github/workflows/docker-publish.yml`) — there is no test/lint CI, so run `npm test` and `npm run lint` locally before pushing.
+
+## License
+
+Beacon Uptime is AGPL-3.0-only (see `LICENSE`), not MIT — the earlier MIT license was never published anywhere. Contributions require signing the CLA (`CLA.md`, process in `CONTRIBUTING.md`) so the same contribution can ship in both the AGPL codebase and a possible future hosted edition; that dual grant is the whole reason the CLA exists — don't reintroduce MIT wording, a different license badge, or an unsigned-contribution path anywhere in this repo.
