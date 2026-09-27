@@ -108,7 +108,7 @@ export default async function PublicStatusPage({
     linkedMonitors.map(async ({ spm, monitor }) => {
       const dailyStats = await db.execute(sql`
         SELECT
-          time_bucket('1 day', time) AS day,
+          date_trunc('day', time, 'UTC') AS day, -- same UTC buckets as time_bucket('1 day'), no TimescaleDB needed
           COUNT(*) AS total,
           COUNT(*) FILTER (WHERE status = 'up') AS up_count,
           ROUND(AVG(response_time_ms)) AS avg_response
