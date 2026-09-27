@@ -1,0 +1,92 @@
+<?xml version="1.0"?>
+<!--
+  BEACON UPTIME — Unraid Community Applications template for the all-in-one
+  image (deploy/aio/Dockerfile). One container: embedded PostgreSQL 16 +
+  TimescaleDB, Redis on loopback, the Next.js dashboard/API, the BullMQ
+  worker and the scheduler, all under supervisord. All state — the Postgres
+  data directory and the self-generated secrets file (session secret +
+  embedded database password) — lives in the /data volume. The template
+  carries NO secrets: the container generates its own on first boot.
+
+  Locked topology (2026-09-27): one public hostname,
+  https://beacon.pluginsynthesis.com, behind Nginx Proxy Manager on this LAN
+  — the same shape as the hellgrid deployment (unraid/hellgrid.xml). NPM
+  terminates TLS and forwards plain http to this container's host port
+  3410 (verified free). Beacon builds every absolute link (status pages,
+  subscriber emails, incident links) from BASE_URL rather than from request
+  headers, so there is no host-header/redirect-loop hazard — but it also
+  means the session cookie is always marked Secure in this image (Beacon
+  hardcodes that to NODE_ENV=production, not to an env toggle the way
+  hellgrid's SESSION_SECURE_COOKIE is). Reach this install through the
+  https:// hostname; hitting the bare LAN IP over http will accept the
+  password and then silently fail to keep you logged in, because the
+  browser won't return a Secure cookie over a plain-http connection. Docs:
+  docs/UNRAID.md.
+-->
+<Container version="2">
+  <Name>beacon-uptime</Name>
+  <Repository>ghcr.io/straplocked/beacon-uptime:aio</Repository>
+  <Registry>https://github.com/straplocked/beacon-uptime/pkgs/container/beacon-uptime</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/straplocked/beacon-uptime/issues</Support>
+  <Project>https://github.com/straplocked/beacon-uptime</Project>
+  <Overview>Open-source uptime monitoring: HTTP/TCP/DNS/SSL/Ping/Heartbeat monitors, public status pages, incident management, and multi-channel alerting (email, Slack, Discord, webhooks).
+
+This all-in-one image runs the whole stack in one container: an embedded PostgreSQL 16 + TimescaleDB database, a loopback-only Redis, the dashboard/API, the BullMQ worker and the scheduler, supervised together. All state (the database and a self-generated secrets file) lives in the one /data share — back that folder up and you've backed up the install.
+
+First boot generates the session secret and the embedded database's password automatically; no secret needs to be typed to get a working install. Register the first account at the web UI to get started.
+
+For access beyond your LAN, put a reverse-proxy in front (Nginx Proxy Manager or SWAG both work) and set the Base URL below to your public https address — Beacon builds every absolute link (status pages, alert emails, incident links) from that value.
+
+To use an external Postgres or Redis instead of the embedded ones, fill in the optional Database URL / Redis URL fields (advanced) — leaving them blank uses the embedded services. An external database must have the TimescaleDB extension available; migrations fail fast if it doesn't.</Overview>
+  <Category>Tools: Network:Management</Category>
+  <WebUI>http://[IP]:[PORT:3410]</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/straplocked/beacon-uptime/main/unraid/beacon-uptime.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/straplocked/beacon-uptime/main/unraid/beacon-uptime-icon.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires>None for a default install — the embedded database and cache need nothing external. A reverse proxy is only required for access beyond your LAN.</Requires>
+
+  <Config Name="WebUI Port" Target="3000" Default="3410" Mode="tcp"
+          Description="Host port for the dashboard, API and status pages (all served on this one port). 3410 was verified free on this box."
+          Type="Port" Display="always" Required="true" Mask="false">3410</Config>
+
+  <Config Name="Data" Target="/data" Default="/mnt/user/appdata/beacon-uptime" Mode="rw"
+          Description="All state: the embedded PostgreSQL data directory and the auto-generated secrets file (session secret + database password). Back this folder up; losing it loses every monitor, status page and account."
+          Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/beacon-uptime</Config>
+
+  <Config Name="Base URL" Target="BASE_URL" Default="https://beacon.pluginsynthesis.com" Mode=""
+          Description="The public address users and links point to — used to build status page URLs, alert-email links, and incident links. Set this to your reverse-proxy's https hostname before inviting anyone. ⚠ The session cookie is always marked Secure in this image, so sign-in only works over https: reach the install through this hostname (behind a TLS-terminating proxy), not by hitting the bare LAN IP over http."
+          Type="Variable" Display="always" Required="true" Mask="false">https://beacon.pluginsynthesis.com</Config>
+
+  <Config Name="BREVO_API_KEY" Target="BREVO_API_KEY" Default="" Mode=""
+          Description="Optional: API key for Brevo (Sendinblue) — sends alert emails and subscriber notifications. Leave blank to disable outbound email; monitoring, the dashboard and the API all still work without it."
+          Type="Variable" Display="always" Required="false" Mask="true"/>
+
+  <Config Name="FROM_EMAIL" Target="FROM_EMAIL" Default="noreply@beacon.local" Mode=""
+          Description="Optional: the From: address on alert and subscriber emails. Only matters if BREVO_API_KEY is set."
+          Type="Variable" Display="advanced" Required="false" Mask="false">noreply@beacon.local</Config>
+
+  <Config Name="DATABASE_URL" Target="DATABASE_URL" Default="" Mode=""
+          Description="Optional: point at an external PostgreSQL instead of the embedded one (postgresql://user:pass@host:5432/db). It MUST have the TimescaleDB extension available — migrations fail fast if it doesn't. Leave blank to use the embedded database in /data."
+          Type="Variable" Display="advanced" Required="false" Mask="true"/>
+
+  <Config Name="REDIS_URL" Target="REDIS_URL" Default="" Mode=""
+          Description="Optional: point at an external Redis instead of the embedded loopback one (redis://[:password@]host:6379). Leave blank to use the embedded Redis."
+          Type="Variable" Display="advanced" Required="false" Mask="true"/>
+
+  <Config Name="PROBE_REGION" Target="PROBE_REGION" Default="us-east" Mode=""
+          Description="Optional: a region label attached to check results — cosmetic unless you run several instances and compare regions."
+          Type="Variable" Display="advanced" Required="false" Mask="false">us-east</Config>
+
+  <Config Name="DATA_RETENTION_DAYS" Target="DATA_RETENTION_DAYS" Default="365" Mode=""
+          Description="Optional: days of raw check results kept before cleanup. Hourly/daily uptime aggregates are kept for a year regardless."
+          Type="Variable" Display="advanced" Required="false" Mask="false">365</Config>
+</Container>

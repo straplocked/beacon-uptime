@@ -319,7 +319,8 @@ npm run db:seed       # Seed demo data
 |-----|---------|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture: processes, queues, schema |
 | [docs/API.md](docs/API.md) | REST API reference (`/api/v1/*`) |
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Production deployment (Docker, Unraid, NPM) |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Production deployment via Docker Compose (self-hosted VM + NPM) |
+| [docs/UNRAID.md](docs/UNRAID.md) | All-in-one image for Unraid Community Applications (embedded Postgres + Redis, one container) |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Sprint-by-sprint roadmap for the 2026-Q2/Q3 UI overhaul + 3 differentiators |
 | [docs/design/system.md](docs/design/system.md) | Current design system audit (Phase 0 baseline) |
 | [docs/design/handoff-2026-q2.md](docs/design/handoff-2026-q2.md) | Design direction brief for the redesign |
