@@ -152,3 +152,17 @@ this is installed behind an actual proxy, is the operator's.
 ## First login
 
 Open the public URL and register. The first account claims the install (it owns its organization); after that, registration is closed and `/api/auth/register` returns 403. To let more people sign up, set `ALLOW_REGISTRATION=true` in the template (anyone who can reach the URL can then register and create monitors from your server).
+
+## Using an existing PostgreSQL server
+
+Set `DATABASE_URL` in the template (for example
+`postgresql://beacon:<password>@<db-host>:5432/beacon`) and the container skips
+its embedded database. TimescaleDB is optional: on a plain PostgreSQL server
+(such as a stock `postgres:17` container) Beacon uses ordinary tables, and the
+scheduler's `DATA_RETENTION_DAYS` cleanup handles retention. Create the role
+and database first:
+
+```sql
+CREATE ROLE beacon LOGIN PASSWORD '<password>';
+CREATE DATABASE beacon OWNER beacon;
+```
