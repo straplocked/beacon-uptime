@@ -47,7 +47,10 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: true
+          # Docker v2 media types, not OCI: unraid's Check for Updates asks the registry for
+          # Docker manifests, and GHCR answers 404 for a single OCI manifest, so unraid
+          # reported 'up-to-date' forever (found 2026-09-27).
+          outputs: type=registry,oci-mediatypes=false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # Unraid's "Check for Updates" compares a plain manifest digest;
@@ -67,7 +70,10 @@ jobs:
         with:
           context: .
           file: deploy/aio/Dockerfile
-          push: true
+          # Docker v2 media types, not OCI: unraid's Check for Updates asks the registry for
+          # Docker manifests, and GHCR answers 404 for a single OCI manifest, so unraid
+          # reported 'up-to-date' forever (found 2026-09-27).
+          outputs: type=registry,oci-mediatypes=false
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:aio
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:aio-sha-${{ steps.sha.outputs.short }}
