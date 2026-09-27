@@ -4,7 +4,8 @@
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system architecture: processes, queues, schema, monitor lifecycle
 - [API.md](API.md) — REST API reference (`/api/v1/*`)
-- [DEPLOYMENT.md](DEPLOYMENT.md) — production deployment (Docker, Unraid, NPM)
+- [DEPLOYMENT.md](DEPLOYMENT.md) — production deployment via Docker Compose (self-hosted VM + NPM)
+- [UNRAID.md](UNRAID.md) — all-in-one image for Unraid Community Applications (embedded Postgres + Redis, one container)
 
 ## Roadmap & Design
 
