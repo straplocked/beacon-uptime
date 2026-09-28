@@ -2,6 +2,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 import { sql } from "drizzle-orm";
+import { getRetentionDays } from "../src/lib/retention";
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -137,10 +138,46 @@ async function main() {
     // Step 5: Retention policies
     console.log("[migrate] Setting up retention policies...");
     try {
-      await db.execute(
-        sql`SELECT add_retention_policy('check_results', INTERVAL '30 days', if_not_exists => TRUE)`
-      );
-      console.log("[migrate] check_results retention policy set (30 days)");
+      const retentionDays = getRetentionDays();
+
+      // add_retention_policy's if_not_exists only skips creation when a
+      // policy already exists — it does NOT update the interval on one
+      // that does. Older installs (and any fresh install before this fix)
+      // got a policy hardcoded to 30 days regardless of
+      // DATA_RETENTION_DAYS, so if_not_exists alone would leave them stuck
+      // at 30 days forever. Compare the existing policy's interval (if
+      // any) against the configured retention window and only drop +
+      // recreate it on a mismatch.
+      const existing = await db.execute<{ job_id: number; drop_after: string | null }>(sql`
+        SELECT job_id, config ->> 'drop_after' AS drop_after
+        FROM timescaledb_information.jobs
+        WHERE proc_name = 'policy_retention'
+          AND hypertable_name = 'check_results'
+      `);
+
+      let matches = false;
+      if (existing.length > 0 && existing[0].drop_after) {
+        const cmp = await db.execute<{ matches: boolean }>(sql`
+          SELECT (${existing[0].drop_after}::interval = (INTERVAL '1 day' * ${retentionDays})) AS matches
+        `);
+        matches = Boolean(cmp[0]?.matches);
+      }
+
+      if (existing.length > 0 && !matches) {
+        console.log(
+          `[migrate] Existing check_results retention policy (${existing[0].drop_after}) doesn't match DATA_RETENTION_DAYS=${retentionDays}d; replacing`
+        );
+        await db.execute(sql`SELECT remove_retention_policy('check_results', if_exists => TRUE)`);
+      }
+
+      if (existing.length === 0 || !matches) {
+        await db.execute(
+          sql`SELECT add_retention_policy('check_results', INTERVAL '1 day' * ${retentionDays}, if_not_exists => TRUE)`
+        );
+        console.log(`[migrate] check_results retention policy set (${retentionDays} days)`);
+      } else {
+        console.log(`[migrate] check_results retention policy already matches DATA_RETENTION_DAYS=${retentionDays}d`);
+      }
     } catch (e: unknown) {
       console.warn("[migrate] Retention policy note:", errorMessage(e));
     }

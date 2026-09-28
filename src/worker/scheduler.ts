@@ -5,6 +5,7 @@ import postgres from "postgres";
 import * as schema from "../lib/db/schema";
 import { eq, and, lte, or, isNull } from "drizzle-orm";
 import { sql } from "drizzle-orm";
+import { getRetentionDays } from "../lib/retention";
 
 // ─── Setup ──────────────────────────────────────────────────────
 
@@ -132,13 +133,6 @@ async function checkHeartbeats() {
 }
 
 // ─── Data Retention Cleanup ──────────────────────────────────
-
-const DEFAULT_RETENTION_DAYS = 365;
-
-function getRetentionDays(): number {
-  const parsed = parseInt(process.env.DATA_RETENTION_DAYS || "", 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_RETENTION_DAYS;
-}
 
 async function cleanupOldData() {
   try {
