@@ -354,6 +354,145 @@ describe("notification payload", () => {
 });
 
 /* ────────────────────────────────────────────────────────────────
+ * E5 — retry / confirmation policy.
+ *
+ * `monitor.confirmationCount` consecutive failing checks are required
+ * before a monitor transitions to down/degraded and an incident opens.
+ * These tests drive db.update()'s `.set()` payload directly (rather than
+ * just checking notification counts) so a regression that silently
+ * re-confirms on failure #1 — or never confirms at all — shows up here.
+ * ──────────────────────────────────────────────────────────────── */
+
+describe("confirmation / retry policy (E5)", () => {
+  let updateCalls: Record<string, unknown>[];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    updateCalls = [];
+    mockDbUpdate.mockImplementation(() => ({
+      set: (payload: Record<string, unknown>) => {
+        updateCalls.push(payload);
+        return { where: vi.fn().mockResolvedValue(undefined) };
+      },
+    }));
+    mockDbInsert.mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        returning: vi
+          .fn()
+          .mockResolvedValue([{ id: "incident-1", title: "Test is down" }]),
+        then: (resolve: any) => Promise.resolve().then(resolve),
+      }),
+    });
+    mockDbSelect.mockReturnValue(chainable([]));
+  });
+
+  it("N-1 consecutive failures: monitor status is NOT changed and no incident/notification fires", async () => {
+    // confirmationCount 3, already at 1 consecutive failure -> this failure
+    // brings it to 2, still short of the threshold of 3.
+    await processCheckResult(
+      {
+        ...baseMonitor,
+        status: "up",
+        confirmationCount: 3,
+        consecutiveFailures: 1,
+      },
+      downResult
+    );
+
+    expect(updateCalls).toHaveLength(1);
+    expect(updateCalls[0].status).toBe("up"); // unchanged — unconfirmed
+    expect(updateCalls[0].consecutiveFailures).toBe(2);
+    expect(updateCalls[0].nextCheckAt).not.toBeNull(); // retry scheduled sooner
+    expect(mockQueueAdd).not.toHaveBeenCalled();
+  });
+
+  it("Nth consecutive failure confirms the transition to down and triggers notifications", async () => {
+    let callCount = 0;
+    mockDbSelect.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return chainable([]); // no linked status pages
+      return chainable([
+        { id: "ch-1", type: "email", config: { email: "test@example.com" } },
+      ]);
+    });
+
+    // confirmationCount 3, already at 2 consecutive failures -> this failure
+    // is the 3rd, hitting the threshold.
+    await processCheckResult(
+      {
+        ...baseMonitor,
+        status: "up",
+        confirmationCount: 3,
+        consecutiveFailures: 2,
+      },
+      downResult
+    );
+
+    expect(updateCalls).toHaveLength(1);
+    expect(updateCalls[0].status).toBe("down"); // confirmed
+    expect(updateCalls[0].consecutiveFailures).toBe(3);
+    expect(updateCalls[0].nextCheckAt).toBeNull(); // back to normal cadence
+    expect(mockQueueAdd).toHaveBeenCalled();
+    const [, jobData] = mockQueueAdd.mock.calls[0];
+    expect(jobData.payload.event).toBe("monitor.down");
+  });
+
+  it("a successful check resets consecutiveFailures to 0 and recovers immediately, regardless of confirmationCount", async () => {
+    let callCount = 0;
+    mockDbSelect.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return chainable([]); // no linked status pages
+      return chainable([
+        { id: "ch-1", type: "email", config: { email: "test@example.com" } },
+      ]);
+    });
+
+    await processCheckResult(
+      {
+        ...baseMonitor,
+        status: "down",
+        confirmationCount: 5,
+        consecutiveFailures: 4, // was one short of ever confirming again
+      },
+      upResult
+    );
+
+    expect(updateCalls).toHaveLength(1);
+    expect(updateCalls[0].status).toBe("up"); // recovery is immediate
+    expect(updateCalls[0].consecutiveFailures).toBe(0);
+    expect(updateCalls[0].nextCheckAt).toBeNull();
+    expect(mockQueueAdd).toHaveBeenCalled();
+    const [, jobData] = mockQueueAdd.mock.calls[0];
+    expect(jobData.payload.event).toBe("monitor.up");
+  });
+
+  it("confirmationCount 1 (migrated existing monitors) preserves immediate down on the first failure", async () => {
+    let callCount = 0;
+    mockDbSelect.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return chainable([]);
+      return chainable([{ id: "ch-1", type: "webhook", config: {} }]);
+    });
+
+    await processCheckResult(
+      { ...baseMonitor, status: "up", confirmationCount: 1, consecutiveFailures: 0 },
+      downResult
+    );
+
+    expect(updateCalls[0].status).toBe("down");
+    expect(updateCalls[0].consecutiveFailures).toBe(1);
+    expect(mockQueueAdd).toHaveBeenCalled();
+  });
+
+  it("defaults confirmationCount to 1 (immediate) when not provided at all", async () => {
+    // Guards against a regression that silently starts requiring
+    // confirmation for callers that don't pass the new fields.
+    await processCheckResult({ ...baseMonitor, status: "up" }, downResult);
+    expect(updateCalls[0].status).toBe("down");
+  });
+});
+
+/* ────────────────────────────────────────────────────────────────
  * NAMED GUARD — subscriber notifications are unconditional.
  *
  * Until the OSS-only change, `enqueueSubscriberNotifications` read
