@@ -29,9 +29,12 @@ Community Applications path.
 `DATABASE_URL` and `REDIS_URL` are both optional overrides: leave them blank
 to use the embedded services (the default and the recommended setup for a
 single Unraid box), or point either at something external to skip that piece
-entirely. An external database **must** have the TimescaleDB extension
-available — Beacon's own migrations create the extension, a hypertable and
-two continuous aggregates, and fail fast if the extension isn't there.
+entirely. An external database does **not** need TimescaleDB: when the
+extension is available, Beacon's migrations create it along with a hypertable
+and two continuous aggregates; on a plain PostgreSQL server (such as a stock
+`postgres:17` container) they fall back to ordinary tables and the scheduler's
+`DATA_RETENTION_DAYS` cleanup handles retention. See
+[Using an existing PostgreSQL server](#using-an-existing-postgresql-server).
 
 ## Install via the template
 
