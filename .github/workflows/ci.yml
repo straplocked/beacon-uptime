@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+env:
+  # Matches the Dockerfile / deploy/aio/Dockerfile base image (node:20-*).
+  NODE_VERSION: "20"
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Blocking: `npm run lint` runs clean on main as of this workflow's
+      # introduction. If it starts failing again, flip this to
+      # `continue-on-error: true` and note why in a comment here rather
+      # than silently loosening the gate.
+      - name: Run lint
+        run: npm run lint
+
+  worker-typecheck:
+    name: Worker typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # src/worker/** is excluded from tsconfig.json and typechecked
+      # separately (see CLAUDE.md) — this is the same check `npm run build`
+      # runs before bundling, just without the esbuild step.
+      - name: Typecheck worker (tsconfig.worker.json)
+        run: npx tsc -p tsconfig.worker.json --noEmit
+
+  build:
+    name: Next build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Runs without secrets/.env — verified locally that `next build`
+      # succeeds with no DATABASE_URL/REDIS_URL/SESSION_SECRET etc. in the
+      # environment, since nothing here talks to a live DB/Redis at build
+      # time.
+      - name: Next build
+        run: npx next build
