@@ -124,7 +124,6 @@ Color math lives in `src/lib/color/oklch.ts` (sRGB ↔ OKLab ↔ OKLCH, WCAG con
 - **Recharts**: don't annotate the `Tooltip` formatter param — let TS infer it.
 - **BullMQ + ioredis**: BullMQ bundles its own ioredis types, so the shared connection in `src/lib/queue/index.ts` is cast `as any`. Reuse that export instead of creating new clients.
 - **Redis needs `maxRetriesPerRequest: null`** for BullMQ workers.
-- **README drift**: the README says port 3000 and describes a user-scoped schema. Both are stale — it's 3100, and the schema is org-scoped.
 
 ## Docker compose variants
 
@@ -134,7 +133,7 @@ Color math lives in `src/lib/color/oklch.ts` (sRGB ↔ OKLab ↔ OKLCH, WCAG con
 | `docker-compose.dev.yml` | containerized dev with `tsx --watch` (`npm run dev:docker`) |
 | `docker-compose.prod.yml` | self-hosted prod: password-protected Redis, pg backup sidecar |
 
-`entrypoint.sh` runs migrations before starting the server, so container start is migration-gated. Pushing to `main` builds and pushes to GHCR (`.github/workflows/docker-publish.yml`) — there is no test/lint CI, so run `npm test` and `npm run lint` locally before pushing.
+`entrypoint.sh` runs migrations before starting the server, so container start is migration-gated. Pushing to `main` builds and pushes to GHCR (`.github/workflows/docker-publish.yml`). `.github/workflows/ci.yml` runs tests, lint, the worker typecheck and `next build` on every PR and push; still run `npm test` and `npm run lint` locally before pushing. New migrations must be registered in `src/lib/db/migrations/meta/_journal.json` (drizzle silently skips unregistered files).
 
 ## License
 
