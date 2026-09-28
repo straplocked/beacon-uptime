@@ -39,7 +39,11 @@ async function scheduleChecks() {
   try {
     const now = new Date();
 
-    // Find all active monitors that are due for a check
+    // Find all active monitors that are due for a check. A monitor with an
+    // unconfirmed failure (E5 retry/confirmation policy) has `next_check_at`
+    // set to fire sooner than its normal interval — that takes priority
+    // over the normal cadence; once cleared (confirmed or recovered), the
+    // normal last_checked_at + interval_seconds formula applies again.
     const dueMonitors = await db
       .select()
       .from(schema.monitors)
@@ -49,10 +53,21 @@ async function scheduleChecks() {
           or(
             // Never been checked
             isNull(schema.monitors.lastCheckedAt),
-            // Due for a check: last_checked_at + interval_seconds <= now
-            lte(
-              sql`${schema.monitors.lastCheckedAt} + (${schema.monitors.intervalSeconds} * interval '1 second')`,
-              sql`${now.toISOString()}::timestamptz`
+            // A retry is scheduled and due
+            and(
+              sql`${schema.monitors.nextCheckAt} IS NOT NULL`,
+              lte(
+                schema.monitors.nextCheckAt,
+                sql`${now.toISOString()}::timestamptz`
+              )
+            ),
+            // Normal cadence: last_checked_at + interval_seconds <= now
+            and(
+              isNull(schema.monitors.nextCheckAt),
+              lte(
+                sql`${schema.monitors.lastCheckedAt} + (${schema.monitors.intervalSeconds} * interval '1 second')`,
+                sql`${now.toISOString()}::timestamptz`
+              )
             )
           )
         )
@@ -115,6 +130,10 @@ async function checkHeartbeats() {
           target: monitor.target,
           type: monitor.type,
           status: monitor.status,
+          confirmationCount: monitor.confirmationCount,
+          consecutiveFailures: monitor.consecutiveFailures,
+          retryIntervalSeconds: monitor.retryIntervalSeconds,
+          intervalSeconds: monitor.intervalSeconds,
         },
         {
           monitorId: monitor.id,

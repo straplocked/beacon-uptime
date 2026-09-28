@@ -75,6 +75,7 @@ const checkWorker = new Worker(
           expectedStatusCode: mon.expectedStatusCode || 200,
           headers: mon.headers || undefined,
           body: mon.body || undefined,
+          assertions: mon.assertions || undefined,
         });
         break;
 
@@ -124,6 +125,10 @@ const checkWorker = new Worker(
         target: mon.target,
         type: mon.type,
         status: mon.status,
+        confirmationCount: mon.confirmationCount,
+        consecutiveFailures: mon.consecutiveFailures,
+        retryIntervalSeconds: mon.retryIntervalSeconds,
+        intervalSeconds: mon.intervalSeconds,
       },
       {
         monitorId: mon.id,

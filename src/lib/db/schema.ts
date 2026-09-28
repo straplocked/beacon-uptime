@@ -13,6 +13,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import type { FooterConfig } from "@/lib/types/footer";
+import type { Assertion } from "@/lib/monitoring/assertions";
 
 // ─── Enums ──────────────────────────────────────────────────────
 
@@ -195,6 +196,19 @@ export const monitors = pgTable(
     status: monitorStatusEnum("status").default("pending").notNull(),
     lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
     isPaused: boolean("is_paused").default(false).notNull(),
+    // Retry / confirmation policy (E5 — flap protection). New monitors
+    // default to requiring 2 consecutive failures before a down/degraded
+    // transition; the migration backfills existing monitors to 1 so
+    // production behaviour doesn't silently change. See
+    // src/lib/monitoring/limits.ts for the full rationale.
+    confirmationCount: integer("confirmation_count").default(2).notNull(),
+    consecutiveFailures: integer("consecutive_failures").default(0).notNull(),
+    retryIntervalSeconds: integer("retry_interval_seconds").default(30).notNull(),
+    // Set while a failure is unconfirmed so the scheduler re-checks sooner
+    // than the normal interval; cleared once confirmed (down) or recovered.
+    nextCheckAt: timestamp("next_check_at", { withTimezone: true }),
+    // HTTP keyword/body/header/JSON-path assertions (E4). Null/empty = none.
+    assertions: jsonb("assertions").$type<Assertion[]>(),
     // Heartbeat-specific fields
     heartbeatToken: text("heartbeat_token").unique(),
     heartbeatIntervalSeconds: integer("heartbeat_interval_seconds"),

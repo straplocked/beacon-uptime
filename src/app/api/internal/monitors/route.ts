@@ -6,7 +6,13 @@ import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
 import { monitorCheckQueue } from "@/lib/queue";
 import { canEditResources } from "@/lib/auth/permissions";
-import { clampCheckInterval } from "@/lib/monitoring/limits";
+import {
+  clampCheckInterval,
+  clampConfirmationCount,
+  clampRetryInterval,
+} from "@/lib/monitoring/limits";
+import { validateAssertions } from "@/lib/monitoring/assertions";
+import { assertionSchema } from "@/lib/monitoring/assertion-schema";
 
 const createMonitorSchema = z.object({
   name: z.string().min(1).max(100),
@@ -18,6 +24,9 @@ const createMonitorSchema = z.object({
   method: z.enum(["GET", "POST", "HEAD"]).optional(),
   headers: z.record(z.string(), z.string()).optional(),
   body: z.string().optional(),
+  confirmationCount: z.number().int().min(1).max(10).optional(),
+  retryIntervalSeconds: z.number().int().min(1).optional(),
+  assertions: z.array(assertionSchema).max(20).optional(),
 });
 
 export async function GET() {
@@ -58,6 +67,30 @@ export async function POST(request: NextRequest) {
   const data = parsed.data;
   const intervalSeconds = clampCheckInterval(data.intervalSeconds || 60);
 
+  if (data.assertions && data.assertions.length > 0) {
+    try {
+      validateAssertions(data.assertions);
+    } catch (err) {
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : String(err) },
+        { status: 400 }
+      );
+    }
+  }
+
+  // Heartbeat monitors bypass the worker entirely (the scheduler flags them
+  // overdue directly) — confirmation would just delay detection by one
+  // scheduler tick with no benefit, so it's forced to 1 (immediate)
+  // regardless of what's requested. See src/lib/monitoring/limits.ts.
+  const confirmationCount =
+    data.type === "heartbeat"
+      ? 1
+      : clampConfirmationCount(data.confirmationCount ?? 2);
+  const retryIntervalSeconds = clampRetryInterval(
+    data.retryIntervalSeconds ?? 30,
+    intervalSeconds
+  );
+
   // Generate heartbeat token if needed
   let heartbeatToken: string | undefined;
   let heartbeatIntervalSeconds: number | undefined;
@@ -80,6 +113,9 @@ export async function POST(request: NextRequest) {
       method: data.method || "GET",
       headers: data.headers || null,
       body: data.body || null,
+      confirmationCount,
+      retryIntervalSeconds,
+      assertions: data.assertions && data.assertions.length > 0 ? data.assertions : null,
       status: "pending",
       heartbeatToken,
       heartbeatIntervalSeconds,

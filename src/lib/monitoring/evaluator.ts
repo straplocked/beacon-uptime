@@ -11,6 +11,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, and, isNull, ne } from "drizzle-orm";
 import { notificationQueue } from "@/lib/queue";
+import { clampRetryInterval, DEFAULT_RETRY_INTERVAL_SECONDS } from "@/lib/monitoring/limits";
 
 type MonitorStatus = "up" | "down" | "degraded" | "paused" | "pending";
 type CheckStatus = "up" | "down" | "degraded";
@@ -28,6 +29,30 @@ interface CheckResultData {
 /**
  * Stores a check result and handles status transitions.
  * If the monitor's status changed, triggers notifications and auto-incidents.
+ *
+ * ─── Retry / confirmation policy (E5) ──────────────────────────────────
+ * A single failing check no longer flips a monitor straight to
+ * down/degraded and pages everyone. `monitor.confirmationCount` consecutive
+ * failing checks are required first; `monitor.consecutiveFailures` tracks
+ * progress toward that threshold and resets to 0 on any successful check.
+ *
+ * While a failure is unconfirmed, the monitor's *displayed* status is left
+ * exactly where it was — a monitor that was "up" stays "up" (the failure is
+ * still visible as a "down"/"degraded" row in check history, since the
+ * check_results insert below always records the raw probe result), and a
+ * brand-new "pending" monitor stays "pending" until confirmed one way or
+ * the other. This was chosen over inventing a new "verifying" status: it
+ * reuses "pending" for exactly the ambiguity it already represents ("we
+ * don't have a confirmed read yet"), needs no new enum value/migration, and
+ * for an established "up" monitor it's the least surprising option — no
+ * flicker to "down" and back for a single blip.
+ *
+ * Recovery (any confirmed failure -> "up") is always immediate, per spec.
+ *
+ * While unconfirmed, `nextCheckAt` is set to fire the retry sooner than the
+ * monitor's normal `intervalSeconds` cadence (see `clampRetryInterval`);
+ * it's cleared the moment a failure is confirmed or the monitor recovers,
+ * handing scheduling back to the normal interval.
  */
 export async function processCheckResult(
   monitor: {
@@ -37,10 +62,16 @@ export async function processCheckResult(
     target: string;
     type: string;
     status: MonitorStatus;
+    confirmationCount?: number;
+    consecutiveFailures?: number;
+    retryIntervalSeconds?: number;
+    intervalSeconds?: number;
   },
   result: CheckResultData
 ) {
-  // 1. Write check result to DB
+  // 1. Write the raw check result to DB — always the actual probe outcome,
+  // independent of confirmation gating, so check history always shows what
+  // actually happened on every single check.
   await db.insert(checkResults).values({
     time: new Date(),
     monitorId: result.monitorId,
@@ -52,20 +83,57 @@ export async function processCheckResult(
     tlsExpiry: result.tlsExpiry,
   });
 
-  // 2. Update monitor status + last_checked_at
+  // 2. Work out the (possibly gated) monitor-level status transition.
   const previousStatus = monitor.status;
-  const newStatus = result.status;
+  const previousFailures = monitor.consecutiveFailures ?? 0;
+  const confirmationCount = Math.max(1, monitor.confirmationCount ?? 1);
+  const retryIntervalSeconds =
+    monitor.retryIntervalSeconds ?? DEFAULT_RETRY_INTERVAL_SECONDS;
+  const intervalSeconds = monitor.intervalSeconds ?? 60;
+
+  const isFailure = result.status !== "up";
+
+  let newStatus: MonitorStatus;
+  let newConsecutiveFailures: number;
+  let confirmed: boolean;
+
+  if (!isFailure) {
+    // Recovery is unconditional and immediate.
+    newConsecutiveFailures = 0;
+    newStatus = "up";
+    confirmed = true;
+  } else {
+    newConsecutiveFailures = previousFailures + 1;
+    if (newConsecutiveFailures >= confirmationCount) {
+      newStatus = result.status; // "down" | "degraded"
+      confirmed = true;
+    } else {
+      newStatus = previousStatus; // unconfirmed — least-surprising: stay put
+      confirmed = false;
+    }
+  }
+
+  const nextCheckAt = confirmed
+    ? null
+    : new Date(
+        Date.now() +
+          clampRetryInterval(retryIntervalSeconds, intervalSeconds) * 1000
+      );
 
   await db
     .update(monitors)
     .set({
       status: newStatus,
+      consecutiveFailures: newConsecutiveFailures,
+      nextCheckAt,
       lastCheckedAt: new Date(),
       updatedAt: new Date(),
     })
     .where(eq(monitors.id, monitor.id));
 
-  // 3. Check if status changed (ignoring initial pending state)
+  // 3. Check if status changed (ignoring initial pending state). Note this
+  // is automatically false while a failure is unconfirmed, since newStatus
+  // === previousStatus by construction above — no separate gate needed.
   const statusChanged =
     previousStatus !== "pending" &&
     previousStatus !== "paused" &&

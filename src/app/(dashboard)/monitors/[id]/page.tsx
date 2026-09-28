@@ -477,6 +477,27 @@ export default async function MonitorDetailPage({
               value={monitor.regions.join(", ")}
             />
             <ConfigRow
+              icon={<Clock className="h-3 w-3" />}
+              label="Confirmations"
+              value={
+                monitor.confirmationCount <= 1
+                  ? "1 (immediate)"
+                  : `${monitor.confirmationCount} in a row`
+              }
+            />
+            <ConfigRow
+              icon={<Clock className="h-3 w-3" />}
+              label="Retry interval"
+              value={`${monitor.retryIntervalSeconds}s`}
+            />
+            {monitor.type === "http" && (
+              <ConfigRow
+                icon={<Globe className="h-3 w-3" />}
+                label="Assertions"
+                value={`${monitor.assertions?.length ?? 0}`}
+              />
+            )}
+            <ConfigRow
               icon={monitor.isPaused ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
               label="State"
               value={monitor.isPaused ? "Paused" : "Active"}
