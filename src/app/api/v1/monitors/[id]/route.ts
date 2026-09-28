@@ -6,6 +6,12 @@ import { eq, and, desc } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { withRateLimit } from "@/lib/rate-limit";
+import {
+  clampConfirmationCount,
+  clampRetryInterval,
+} from "@/lib/monitoring/limits";
+import { validateAssertions } from "@/lib/monitoring/assertions";
+import { assertionSchema } from "@/lib/monitoring/assertion-schema";
 
 const updateMonitorSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -15,6 +21,9 @@ const updateMonitorSchema = z.object({
   method: z.enum(["GET", "POST", "HEAD"]).optional(),
   headers: z.record(z.string(), z.string()).nullable().optional(),
   body: z.string().nullable().optional(),
+  confirmationCount: z.number().int().min(1).max(10).optional(),
+  retryIntervalSeconds: z.number().int().min(1).optional(),
+  assertions: z.array(assertionSchema).max(20).nullable().optional(),
 });
 
 export async function GET(
@@ -100,6 +109,18 @@ export async function PATCH(
   }
 
   const data = parsed.data;
+
+  if (data.assertions) {
+    try {
+      validateAssertions(data.assertions);
+    } catch (err) {
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : String(err) },
+        { status: 400 }
+      );
+    }
+  }
+
   const updateData: Record<string, unknown> = { updatedAt: new Date() };
 
   if (data.name !== undefined) updateData.name = data.name;
@@ -109,6 +130,24 @@ export async function PATCH(
   if (data.method !== undefined) updateData.method = data.method;
   if (data.headers !== undefined) updateData.headers = data.headers;
   if (data.body !== undefined) updateData.body = data.body;
+  if (data.assertions !== undefined) {
+    updateData.assertions = data.assertions && data.assertions.length > 0 ? data.assertions : null;
+  }
+  if (data.confirmationCount !== undefined) {
+    // Heartbeat monitors bypass the worker and are always confirmed
+    // immediately — see the create route / limits.ts for the rationale.
+    updateData.confirmationCount =
+      existing.type === "heartbeat"
+        ? 1
+        : clampConfirmationCount(data.confirmationCount);
+  }
+  if (data.retryIntervalSeconds !== undefined) {
+    const effectiveInterval = data.intervalSeconds ?? existing.intervalSeconds;
+    updateData.retryIntervalSeconds = clampRetryInterval(
+      data.retryIntervalSeconds,
+      effectiveInterval
+    );
+  }
 
   const [updated] = await db
     .update(monitors)

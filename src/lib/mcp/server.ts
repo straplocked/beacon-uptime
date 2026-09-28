@@ -30,7 +30,13 @@ import {
   organizations,
   statusPages,
 } from "@/lib/db/schema";
-import { clampCheckInterval } from "@/lib/monitoring/limits";
+import {
+  clampCheckInterval,
+  clampConfirmationCount,
+  clampRetryInterval,
+} from "@/lib/monitoring/limits";
+import { validateAssertions } from "@/lib/monitoring/assertions";
+import { assertionSchema } from "@/lib/monitoring/assertion-schema";
 import { extractFromUrl } from "@/lib/color/favicon";
 
 type Org = typeof organizations.$inferSelect;
@@ -101,6 +107,30 @@ export function buildMcpServer(org: Org): McpServer {
     timeoutMs: z.number().int().min(1000).max(60000).optional(),
     expectedStatusCode: z.number().int().optional(),
     method: z.enum(["GET", "POST", "HEAD"]).optional(),
+    confirmationCount: z
+      .number()
+      .int()
+      .min(1)
+      .max(10)
+      .optional()
+      .describe(
+        "Consecutive failing checks required before the monitor transitions to down/degraded and opens an incident. Default 2. Ignored (forced to 1) for heartbeat monitors.",
+      ),
+    retryIntervalSeconds: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe(
+        "How soon to re-check after a failure that hasn't yet met confirmationCount, instead of waiting a full intervalSeconds cycle. Default 30s, floored at 15s, capped at the monitor's own intervalSeconds.",
+      ),
+    assertions: z
+      .array(assertionSchema)
+      .max(20)
+      .optional()
+      .describe(
+        "HTTP response assertions evaluated after a successful status-code check: body_contains, body_not_contains, body_regex (pattern capped at 200 chars, rejected if it looks catastrophically backtracking), header_equals, json_path_equals (simple dot/bracket path, no eval). Any failing assertion fails the check.",
+      ),
   } as const;
 
   server.tool(
@@ -109,6 +139,19 @@ export function buildMcpServer(org: Org): McpServer {
     createMonitorSchema,
     async (args) => {
       const intervalSeconds = clampCheckInterval(args.intervalSeconds ?? 60);
+      if (args.assertions && args.assertions.length > 0) {
+        validateAssertions(args.assertions);
+      }
+      // Heartbeat monitors bypass the worker entirely — confirmation would
+      // just delay overdue detection by a scheduler tick with no benefit.
+      const confirmationCount =
+        args.type === "heartbeat"
+          ? 1
+          : clampConfirmationCount(args.confirmationCount ?? 2);
+      const retryIntervalSeconds = clampRetryInterval(
+        args.retryIntervalSeconds ?? 30,
+        intervalSeconds,
+      );
       let heartbeatToken: string | undefined;
       let heartbeatIntervalSeconds: number | undefined;
       if (args.type === "heartbeat") {
@@ -126,6 +169,12 @@ export function buildMcpServer(org: Org): McpServer {
           timeoutMs: args.timeoutMs ?? 10000,
           expectedStatusCode: args.expectedStatusCode ?? 200,
           method: args.method ?? "GET",
+          confirmationCount,
+          retryIntervalSeconds,
+          assertions:
+            args.assertions && args.assertions.length > 0
+              ? args.assertions
+              : null,
           status: "pending",
           heartbeatToken,
           heartbeatIntervalSeconds,
@@ -146,14 +195,70 @@ export function buildMcpServer(org: Org): McpServer {
       timeoutMs: z.number().int().min(1000).max(60000).optional(),
       expectedStatusCode: z.number().int().optional(),
       method: z.enum(["GET", "POST", "HEAD"]).optional(),
+      confirmationCount: z
+        .number()
+        .int()
+        .min(1)
+        .max(10)
+        .optional()
+        .describe(
+          "Consecutive failing checks required before down/degraded. Forced to 1 for heartbeat monitors.",
+        ),
+      retryIntervalSeconds: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe(
+          "Retry cadence while a failure is unconfirmed. Floored at 15s, capped at the monitor's intervalSeconds.",
+        ),
+      assertions: z
+        .array(assertionSchema)
+        .max(20)
+        .nullable()
+        .optional()
+        .describe("Replaces the full assertions list. Pass null or [] to clear it."),
     },
     async ({ id, ...updates }) => {
+      if (updates.assertions) {
+        validateAssertions(updates.assertions);
+      }
+
+      const [existing] = await db
+        .select({ type: monitors.type, intervalSeconds: monitors.intervalSeconds })
+        .from(monitors)
+        .where(and(eq(monitors.id, id), eq(monitors.organizationId, orgId)))
+        .limit(1);
+      if (!existing) throw new Error(`Monitor ${id} not found`);
+
       const finalUpdates: Record<string, unknown> = { ...updates };
       if (typeof finalUpdates.intervalSeconds === "number") {
         finalUpdates.intervalSeconds = clampCheckInterval(
           finalUpdates.intervalSeconds as number,
         );
       }
+      if (typeof updates.confirmationCount === "number") {
+        finalUpdates.confirmationCount =
+          existing.type === "heartbeat"
+            ? 1
+            : clampConfirmationCount(updates.confirmationCount);
+      }
+      if (typeof updates.retryIntervalSeconds === "number") {
+        const effectiveInterval =
+          (finalUpdates.intervalSeconds as number | undefined) ??
+          existing.intervalSeconds;
+        finalUpdates.retryIntervalSeconds = clampRetryInterval(
+          updates.retryIntervalSeconds,
+          effectiveInterval,
+        );
+      }
+      if (updates.assertions !== undefined) {
+        finalUpdates.assertions =
+          updates.assertions && updates.assertions.length > 0
+            ? updates.assertions
+            : null;
+      }
+
       const [m] = await db
         .update(monitors)
         .set({ ...finalUpdates, updatedAt: new Date() })

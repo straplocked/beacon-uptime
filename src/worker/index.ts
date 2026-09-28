@@ -75,6 +75,7 @@ const checkWorker = new Worker(
           expectedStatusCode: mon.expectedStatusCode || 200,
           headers: mon.headers || undefined,
           body: mon.body || undefined,
+          assertions: mon.assertions || undefined,
         });
         break;
 

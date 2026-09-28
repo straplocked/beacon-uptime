@@ -41,6 +41,10 @@ GET /api/v1/monitors
       "timeoutMs": 10000,
       "expectedStatusCode": 200,
       "method": "GET",
+      "confirmationCount": 2,
+      "consecutiveFailures": 0,
+      "retryIntervalSeconds": 30,
+      "assertions": null,
       "isPaused": false,
       "lastCheckedAt": "2026-03-12T00:15:43.000Z",
       "createdAt": "2026-03-01T12:00:00.000Z"
@@ -68,6 +72,9 @@ POST /api/v1/monitors
 | `method` | string | No | `GET` | HTTP method: `GET`, `POST`, or `HEAD` |
 | `headers` | object | No | null | HTTP headers as key-value pairs |
 | `body` | string | No | null | HTTP request body |
+| `confirmationCount` | number | No | 2 | Consecutive failing checks required before the monitor transitions to `down`/`degraded` and an incident opens (1-10). `1` = alert on the first failure (no flap protection) — this is what existing monitors were migrated to, so behaviour doesn't silently change. Forced to `1` for `heartbeat` monitors regardless of what's passed. |
+| `retryIntervalSeconds` | number | No | 30 | How soon to re-check after a failure that hasn't yet met `confirmationCount`, instead of waiting a full `intervalSeconds` cycle. Floored at 15s (the scheduler's own tick resolution) and capped at the monitor's own `intervalSeconds`. |
+| `assertions` | array | No | null | HTTP response assertions, evaluated after a successful status-code check (see [Assertions](#assertions) below). Max 20 per monitor. |
 
 ```json
 {
@@ -76,9 +83,29 @@ POST /api/v1/monitors
   "target": "https://api.example.com/health",
   "intervalSeconds": 60,
   "method": "GET",
-  "expectedStatusCode": 200
+  "expectedStatusCode": 200,
+  "confirmationCount": 2,
+  "retryIntervalSeconds": 30,
+  "assertions": [
+    { "type": "body_contains", "value": "\"status\":\"ok\"" },
+    { "type": "header_equals", "header": "content-type", "value": "application/json" }
+  ]
 }
 ```
+
+#### Assertions
+
+Each assertion is one of:
+
+| `type` | Fields | Behaviour |
+|--------|--------|-----------|
+| `body_contains` | `value` (string, 1-1000 chars) | Fails if the response body does not contain `value`. |
+| `body_not_contains` | `value` (string, 1-1000 chars) | Fails if the response body contains `value`. |
+| `body_regex` | `pattern` (string, max 200 chars) | Fails if the response body (first 1 MB scanned) does not match `pattern`. Patterns shaped like classic catastrophic-backtracking constructs (nested quantifiers like `(a+)+`, quantified alternation like `(a\|a)+`, or more than 10 quantifiers) are **rejected at request time** with a `400`, before ever being run against a real body. |
+| `header_equals` | `header`, `value` | Fails if the named response header (case-insensitive) is missing or doesn't exactly equal `value`. |
+| `json_path_equals` | `path` (simple dot/bracket path, e.g. `data.status` or `items[0].id`; no eval/expressions), `value` | Fails if the body isn't valid JSON, or the resolved value (stringified) doesn't equal `value`. |
+
+Assertions are only evaluated once the HTTP status code already matches `expectedStatusCode` — a wrong status code is its own, clearer failure and skips assertion evaluation entirely. Assertions are evaluated in order and stop at the first failure; the failing assertion's message is recorded as the check's `errorMessage`, so `GET /api/v1/monitors/:id` and check history show exactly why a check failed (e.g. `"Assertion failed: body does not contain \"healthy\""`).
 
 **Response** `201`
 
@@ -135,13 +162,16 @@ Returns the monitor, its 20 most recent checks, and 24-hour uptime stats.
 PATCH /api/v1/monitors/:id
 ```
 
-All fields are optional. Only include fields you want to change.
+All fields are optional. Only include fields you want to change. `confirmationCount` and `retryIntervalSeconds` are clamped the same way as on create; passing `assertions` **replaces** the full list (pass `null` or `[]` to clear it).
 
 ```json
 {
   "name": "Updated Name",
   "intervalSeconds": 30,
-  "timeoutMs": 5000
+  "timeoutMs": 5000,
+  "confirmationCount": 3,
+  "retryIntervalSeconds": 20,
+  "assertions": [{ "type": "body_contains", "value": "ok" }]
 }
 ```
 

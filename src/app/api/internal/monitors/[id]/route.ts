@@ -7,6 +7,12 @@ import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { monitorCheckQueue } from "@/lib/queue";
 import { canEditResources } from "@/lib/auth/permissions";
+import {
+  clampConfirmationCount,
+  clampRetryInterval,
+} from "@/lib/monitoring/limits";
+import { validateAssertions } from "@/lib/monitoring/assertions";
+import { assertionSchema } from "@/lib/monitoring/assertion-schema";
 
 const updateMonitorSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -17,6 +23,9 @@ const updateMonitorSchema = z.object({
   headers: z.record(z.string(), z.string()).nullable().optional(),
   body: z.string().nullable().optional(),
   isPaused: z.boolean().optional(),
+  confirmationCount: z.number().int().min(1).max(10).optional(),
+  retryIntervalSeconds: z.number().int().min(1).optional(),
+  assertions: z.array(assertionSchema).max(20).nullable().optional(),
 });
 
 export async function GET(
@@ -105,6 +114,17 @@ export async function PATCH(
   const updateData: Record<string, unknown> = { updatedAt: new Date() };
   const data = parsed.data;
 
+  if (data.assertions) {
+    try {
+      validateAssertions(data.assertions);
+    } catch (err) {
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : String(err) },
+        { status: 400 }
+      );
+    }
+  }
+
   if (data.name !== undefined) updateData.name = data.name;
   if (data.intervalSeconds !== undefined) updateData.intervalSeconds = data.intervalSeconds;
   if (data.timeoutMs !== undefined) updateData.timeoutMs = data.timeoutMs;
@@ -112,6 +132,20 @@ export async function PATCH(
   if (data.method !== undefined) updateData.method = data.method;
   if (data.headers !== undefined) updateData.headers = data.headers;
   if (data.body !== undefined) updateData.body = data.body;
+  if (data.assertions !== undefined) {
+    updateData.assertions = data.assertions && data.assertions.length > 0 ? data.assertions : null;
+  }
+  if (data.confirmationCount !== undefined) {
+    updateData.confirmationCount =
+      existing.type === "heartbeat" ? 1 : clampConfirmationCount(data.confirmationCount);
+  }
+  if (data.retryIntervalSeconds !== undefined) {
+    const effectiveInterval = data.intervalSeconds ?? existing.intervalSeconds;
+    updateData.retryIntervalSeconds = clampRetryInterval(
+      data.retryIntervalSeconds,
+      effectiveInterval
+    );
+  }
   if (data.isPaused !== undefined) {
     updateData.isPaused = data.isPaused;
     updateData.status = data.isPaused ? "paused" : "pending";
