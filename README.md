@@ -74,6 +74,30 @@ set for both themes lives in [docs/assets/screenshots/](docs/assets/screenshots/
 All screenshots use fake `example.com`-style data; see
 [scripts/screenshots/](scripts/screenshots/) to re-shoot your own.
 
+## Install on your phone
+
+Beacon is an installable Progressive Web App — add it to your home screen for
+a full-screen, app-like dashboard with offline support for the pages you've
+already loaded.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/mobile/dark/dashboard.png">
+  <img src="docs/assets/screenshots/mobile/light/dashboard.png" alt="Beacon dashboard on a phone, installed as a standalone app" width="320">
+</picture>
+
+- **Android / desktop Chrome** — an "Install app" prompt appears in the
+  sidebar once the browser decides the app is installable; tap it (or use
+  the browser's own install icon in the address bar).
+- **iOS Safari** — there's no automatic install prompt (Apple doesn't
+  support one), so Beacon shows a one-line hint instead: tap **Share**, then
+  **Add to Home Screen**.
+
+Once installed, a small service worker (`public/sw.js`) precaches the app
+icons and a static offline page, so a lost connection shows a friendly
+"you're offline" screen instead of a browser error — it never caches `/api/*`
+responses or another user's authenticated pages, only static assets and
+build output.
+
 ## Features
 
 - **6 monitor types** — HTTP, TCP, DNS, SSL, Ping, Heartbeat

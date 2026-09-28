@@ -53,8 +53,8 @@ export function CheckHistory({ checks }: { checks: Check[] }) {
   }
 
   return (
-    <div className="max-h-[480px] overflow-y-auto">
-      <table className="w-full border-collapse text-[12px]">
+    <div className="max-h-[480px] overflow-y-auto overflow-x-auto">
+      <table className="w-full border-collapse text-[12px] min-w-[520px]">
         <thead className="sticky top-0 bg-card z-[1]">
           <tr>
             <th className="w-9" />
