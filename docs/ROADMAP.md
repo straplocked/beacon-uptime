@@ -7,7 +7,7 @@
 
 By the end of this roadmap Beacon Uptime will:
 1. Look like a **2026 product** (Linear-density dashboard, light+dark parity, custom mark, accessible).
-2. Own three positioning flags that competitors don't: **incident collaboration UI**, **auto-branded status pages**, **native MCP server**.
+2. Own two positioning flags most self-hosted competitors don't: **incident collaboration UI** (acknowledge + internal-vs-public comments) and **auto-branded status pages**. (The MCP server, shipped in Sprint 7, is a useful feature but not a differentiator — Better Stack, OneUptime, OpenStatus, and Datadog all ship MCP servers too.)
 3. Feel **alive** — WebSocket realtime updates across the dashboard.
 4. Be **AA accessible** with a measured score on every rebuilt route.
 
@@ -373,6 +373,6 @@ If 16 weeks is too long, here's how to compress:
 
 - **Drop to 12 weeks:** parallelize Sprint 4 + 5 (different engineers) and Sprint 6 + 7 (Diff #2 is a small feature, can ride alongside Diff #3).
 - **Drop to 10 weeks:** also defer Sprint 8's a11y work to a follow-up release. *Not recommended* — shipping with 30% AA undermines the positioning.
-- **Drop to 8 weeks:** also descope Diff #3 (MCP) to Q3. *Not recommended* — MCP is the strongest 2026 positioning angle and the implementation is small.
+- **Drop to 8 weeks:** also descope Diff #3 (MCP) to Q3. Safer to cut than the other differentiators — MCP is a useful integration, not a positioning angle (see Outcome above), and the implementation is small enough to slot into Q3 without disrupting the rest of the plan.
 
 If 16 weeks is too short, the most likely cause is the WebSocket layer (Sprint 7+8 split). Fallback: cut to SSE on the 5 priority surfaces only — the user-visible behavior is identical for the read-heavy use cases.

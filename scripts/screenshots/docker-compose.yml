@@ -1,0 +1,47 @@
+# Standalone db+redis stack for the throwaway "beacon-shots" screenshot
+# capture project — see scripts/screenshots/README.md.
+#
+# Deliberately NOT layered on top of the root docker-compose.yml: compose
+# merges list-valued keys like `ports` across -f files by concatenation, not
+# replacement, so overriding just the port would still try to bind the base
+# file's 5433/6380 too and collide with the always-on main dev stack. A
+# fully separate file avoids that.
+#
+# Usage:
+#   docker compose -p beacon-shots -f scripts/screenshots/docker-compose.yml up -d
+#   docker compose -p beacon-shots -f scripts/screenshots/docker-compose.yml down -v   # teardown
+#
+# The app itself is NOT run in Docker here — run it on the host with
+# `npm run dev -- --port <port>` so NODE_ENV stays "development" (the
+# production Docker image sets NODE_ENV=production, which marks the session
+# cookie Secure and breaks login over plain http://localhost — see
+# docs/UNRAID.md). Point DATABASE_URL/REDIS_URL at the ports below.
+#
+# Ports are placeholders chosen at capture time to avoid colliding with the
+# always-on dev stack (5433/6380) and anything else running locally —
+# re-check availability before a re-shoot rather than assuming these are
+# still free.
+services:
+  db:
+    image: timescale/timescaledb:latest-pg16
+    ports:
+      - "5487:5432"
+    environment:
+      - POSTGRES_USER=beacon
+      - POSTGRES_PASSWORD=beacon
+      - POSTGRES_DB=beacon
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U beacon"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6487:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5

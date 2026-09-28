@@ -1,28 +1,108 @@
 # Beacon Uptime
 
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
+[![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](LICENSE)
+[![CLA required](https://img.shields.io/badge/contributions-CLA%20required-informational.svg)](CLA.md)
 
-Open-source uptime monitoring platform with public status pages, incident management, and multi-channel alerting. Built with Next.js 16, PostgreSQL + TimescaleDB, and BullMQ.
+A self-hostable uptime monitor and status page tool with a real incident
+response loop, not just a green/red dashboard: acknowledge an incident,
+work it with your team in internal-only comments, and only publish the
+updates you choose to your public status page and subscribers.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/dark/dashboard.png">
+    <img src="docs/assets/screenshots/light/dashboard.png" alt="Beacon Uptime dashboard, showing monitors, an active incident banner, and uptime stats" width="880">
+  </picture>
+</p>
+
+## Why Beacon
+
+- **A real incident response loop, not just alerting.** Acknowledge an
+  incident so your team knows someone's on it. Work the problem in
+  timeline comments that are explicitly marked internal-only — they never
+  reach your public status page or subscribers — and post a separate
+  public update only when you're ready to. See it in the screenshots
+  below.
+- **Multi-tenant from the start**, not bolted on later: organizations,
+  roles (owner/admin/member/viewer), and an org switcher are core to every
+  install, not a paid tier.
+- **One edition, self-hosted, AGPL-3.0-only.** Everything in this repo —
+  unlimited monitors, status pages, the API, custom domains, subscriber
+  notifications — is available to every install. No license key, no
+  usage-gated feature flags.
+- **A REST API and an MCP server**, so you can script it or point an
+  MCP-aware agent (Claude Desktop, Claude Code, Cursor, etc.) at it to
+  query uptime, create monitors, or acknowledge incidents from chat. MCP
+  support is a convenience, not something unique to Beacon — several other
+  uptime tools ship one too.
+
+What Beacon **doesn't** do yet: on-call schedules or escalation policies.
+That's on the [roadmap](docs/ROADMAP.md), not built. If you need paging
+today, keep using a dedicated on-call tool alongside Beacon's alerting.
+
+## Screenshots
+
+<table>
+<tr>
+<td width="50%">
+
+**Monitor detail** — response time chart with an incident-window overlay, percentiles, related incidents
+<img src="docs/assets/screenshots/dark/monitor-detail.png" alt="Monitor detail page with response time chart">
+</td>
+<td width="50%">
+
+**Incident collaboration** — acknowledge state, a threaded timeline, and an internal-only comment that won't publish
+<img src="docs/assets/screenshots/dark/incident-detail.png" alt="Incident detail page showing the acknowledge state and an internal comment">
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+**Public status page** — auto-branded, grouped components, uptime history
+<img src="docs/assets/screenshots/dark/status-page.png" alt="Public status page with grouped components and uptime bars">
+</td>
+<td width="50%">
+
+**Settings** — API keys, MCP connection string, notification channels
+<img src="docs/assets/screenshots/dark/settings.png" alt="Settings page showing API keys and MCP setup">
+</td>
+</tr>
+</table>
+
+Light mode is a first-class target too (see the hero image above) — full
+set for both themes lives in [docs/assets/screenshots/](docs/assets/screenshots/).
+All screenshots use fake `example.com`-style data; see
+[scripts/screenshots/](scripts/screenshots/) to re-shoot your own.
 
 ## Features
 
-- **6 monitor types** -- HTTP, TCP, DNS, SSL, Ping, Heartbeat
-- **Public status pages** -- branded, embeddable, with custom domains
-- **Incident management** -- manual + auto-created incidents with timeline updates, **acknowledge state**, and **internal-only comments** that never publish to subscribers
-- **Multi-channel alerts** -- Email (Brevo), Slack, Discord, Webhooks (HMAC-signed)
-- **Subscriber notifications** -- visitors subscribe to status page updates via email
-- **REST API** -- full v1 API with key-based auth and rate limiting
-- **MCP server** -- agent-native at `POST /api/mcp`. 16 tools (list / create / update / pause / acknowledge / brand-extract / etc.) for Claude Desktop, Claude Code, Cursor. See [docs/MCP.md](docs/MCP.md).
-- **Multi-tenant by default** -- organizations, roles (owner/admin/member/viewer), and an org switcher are core, not a paid tier
-- **Time-series analytics** -- TimescaleDB continuous aggregates for uptime history, p50/p95/p99 percentile stats per monitor
-- **Light + dark mode** -- both treated as first-class; Linear-tight density, semantic tokens (`--status-*`, `--severity-*`, `--incident-*`)
+- **6 monitor types** — HTTP, TCP, DNS, SSL, Ping, Heartbeat
+- **Public status pages** — branded, embeddable, with custom domains
+- **Incident management** — manual + auto-created incidents with timeline
+  updates, **acknowledge state**, and **internal-only comments** that never
+  publish to subscribers
+- **Multi-channel alerts** — Email (Brevo), Slack, Discord, Webhooks
+  (HMAC-signed)
+- **Subscriber notifications** — visitors subscribe to status page updates
+  via email
+- **REST API** — full v1 API with key-based auth and rate limiting ([docs/API.md](docs/API.md))
+- **MCP server** — `POST /api/mcp`, 16 tools (list / create / update /
+  pause / acknowledge / brand-extract / etc.) for MCP clients like Claude
+  Desktop, Claude Code, and Cursor ([docs/MCP.md](docs/MCP.md))
+- **Multi-tenant by default** — organizations, roles, and an org switcher
+  are core, not a paid tier
+- **Time-series analytics** — TimescaleDB continuous aggregates for uptime
+  history, p50/p95/p99 percentile stats per monitor (falls back to plain
+  PostgreSQL if TimescaleDB isn't available — see [Architecture](#architecture))
+- **Light + dark mode** — both first-class; semantic status/severity/incident
+  color tokens
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | Framework | Next.js 16 (App Router), React 19, TypeScript 5 |
-| Database | PostgreSQL 16 + TimescaleDB |
+| Database | PostgreSQL 16, TimescaleDB extension optional |
 | ORM | Drizzle ORM |
 | Queue | BullMQ + Redis 7 |
 | Styling | Tailwind CSS 4 + shadcn/ui |
@@ -31,6 +111,8 @@ Open-source uptime monitoring platform with public status pages, incident manage
 | Validation | Zod 4 |
 
 ## Architecture
+
+Three processes share one codebase and one database:
 
 ```
                  Browser
@@ -42,12 +124,14 @@ Open-source uptime monitoring platform with public status pages, incident manage
                     |
          +----------+-----------+
          |          |           |
-    Dashboard   Public API   Status Pages
-    (internal)    (v1)        (/s/[slug])
+    Dashboard   REST API    Status Pages
+    (session)   (API key)    (/s/[slug])
          |          |           |
          +-----+----+-----------+
                |
-          PostgreSQL + TimescaleDB
+          PostgreSQL
+      (TimescaleDB extension
+       optional, see below)
                |
           +----+----+
           |         |
@@ -59,13 +143,31 @@ Open-source uptime monitoring platform with public status pages, incident manage
              Redis
 ```
 
-**Three processes run in production:**
+1. **Next.js app** — serves the dashboard, all API routes (`/api/internal`,
+   `/api/v1`, `/api/public`, `/api/mcp`), and public status pages.
+2. **Scheduler** (`src/worker/scheduler.ts`) — polls for due monitors every
+   15s, enqueues check jobs, flags overdue heartbeat monitors, and runs
+   data-retention cleanup roughly hourly.
+3. **Worker** (`src/worker/index.ts`) — a BullMQ worker that performs the
+   actual HTTP/TCP/DNS/SSL/Ping checks and delivers notifications.
 
-1. **Next.js app** -- serves dashboard, API routes, and status pages
-2. **Scheduler** -- polls for due monitors every 15s, enqueues check jobs, manages heartbeats, runs data retention cleanup
-3. **Worker** -- processes monitor checks and sends notifications via BullMQ queues
+**PostgreSQL is required; the TimescaleDB extension is optional.**
+`scripts/migrate.ts` tries to enable TimescaleDB and, if it's available,
+converts `check_results` into a hypertable with `hourly_uptime` /
+`daily_uptime` continuous aggregates for fast percentile queries. If the
+extension isn't installed (a stock `postgres:17` container, most managed
+Postgres offerings, etc.), migrations detect that and fall back to plain
+tables automatically — Beacon still works, retention is handled by the
+scheduler's `DATA_RETENTION_DAYS` cleanup instead of a TimescaleDB
+retention policy, and percentile queries just run a bit slower at scale.
 
-## Quick Start
+**Redis** backs the BullMQ queues (`monitor-checks`, `notifications`) and
+the API rate limiter.
+
+Full detail, including the check pipeline, auth model, and queue config:
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Quick Start (local development)
 
 ### Prerequisites
 
@@ -75,243 +177,128 @@ Open-source uptime monitoring platform with public status pages, incident manage
 ### Setup
 
 ```bash
-# Clone and install
-git clone <repo-url> && cd beacon-uptime
+git clone https://github.com/straplocked/beacon-uptime.git && cd beacon-uptime
 npm install
 
-# Start database and Redis
+# Start database and Redis (host ports 5433 / 6380)
 docker compose up -d db redis
 
-# Configure environment
 cp .env.example .env.local
-# Edit .env.local with your keys (see Environment Variables below)
+# edit .env.local — see Environment Variables below
 
-# Run migrations and seed demo data
+# DATABASE_URL isn't read from .env.local by the db:* scripts; export it
+export DATABASE_URL=postgresql://beacon:beacon@localhost:5433/beacon
 npm run db:migrate
 npm run db:seed
 ```
 
-### Run (3 terminals)
+### Run (3 terminals — all three are needed for monitoring to actually run)
 
 ```bash
-# Terminal 1 -- Next.js dev server
-npm run dev
-
-# Terminal 2 -- BullMQ worker (monitor checks + notifications)
-npm run worker
-
-# Terminal 3 -- Scheduler (job scheduling + heartbeats + cleanup)
-npm run scheduler
+npm run dev         # dashboard + API on http://localhost:3100
+npm run worker       # BullMQ worker — monitor checks + notification delivery
+npm run scheduler    # scheduling loop + heartbeat watchdog + retention cleanup
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Demo login: `demo@beacon.local` / `password123`
+Open [http://localhost:3100](http://localhost:3100). Demo login (from
+`npm run db:seed`): `demo@beacon.local` / `password123`.
+
+## Self-Hosting
+
+Two supported paths — pick one:
+
+### Docker Compose (VM / NAS / general Docker host)
+
+Multi-container: app, worker, scheduler, Postgres+TimescaleDB, Redis.
+
+```bash
+git clone https://github.com/straplocked/beacon-uptime.git && cd beacon-uptime
+cp .env.example .env      # fill in DATABASE_URL/REDIS_URL secrets, BASE_URL, etc.
+docker compose -f docker-compose.prod.yml up -d
+```
+
+`docker-compose.prod.yml` pulls the prebuilt `ghcr.io/straplocked/beacon-uptime:latest`
+image (built on every push to `main` — see `.github/workflows/docker-publish.yml`)
+rather than building locally, adds a password-protected Redis and a daily
+`pg_dump` backup sidecar, and expects `POSTGRES_PASSWORD`, `REDIS_PASSWORD`,
+`BASE_URL`, `SESSION_SECRET`, `BREVO_API_KEY`, and `FROM_EMAIL` in the
+environment (`.env.example` covers the app-level ones; set the Postgres/Redis
+passwords yourself). The app container runs migrations automatically on
+startup. Put a reverse proxy (nginx, Nginx Proxy Manager, Caddy, Traefik...)
+in front for TLS. Full walkthrough, including an Nginx Proxy Manager
+example: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+### All-in-one image (single container — Unraid or plain `docker run`)
+
+`ghcr.io/straplocked/beacon-uptime:aio` bundles the app, worker, scheduler,
+an embedded PostgreSQL+TimescaleDB, and a loopback-only Redis under
+`supervisord` in one container — no separate database or cache container to
+run. `DATABASE_URL`/`REDIS_URL` are optional overrides if you'd rather point
+it at something external.
+
+```bash
+docker run -d --name beacon-uptime \
+  -p 3410:3000 \
+  -v /path/to/appdata:/data \
+  -e BASE_URL=https://beacon.example.com \
+  ghcr.io/straplocked/beacon-uptime:aio
+```
+
+For Unraid Community Applications, the repo ships a ready-made template at
+[`unraid/beacon-uptime.xml`](unraid/beacon-uptime.xml) (copy it to
+`/boot/config/plugins/dockerMan/templates-user/` or wait for it to appear
+in Community Applications). Default WebUI port is `3410`. No secret to type
+in to get started — the container generates its own session secret and
+database password into `/data` on first boot. Full runbook, including
+backups, updates, and the reverse-proxy `Secure`-cookie gotcha:
+[docs/UNRAID.md](docs/UNRAID.md).
+
+Either path: **the first account to register owns the install** — see
+`ALLOW_REGISTRATION` below.
 
 ## Environment Variables
 
+Derived from [`.env.example`](.env.example) and what the code actually
+reads (`process.env.*` across `src/` and `scripts/`).
+
 | Variable | Required | Description |
-|----------|----------|-------------|
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `REDIS_URL` | Yes | Redis connection string |
-| `SESSION_SECRET` | Yes | 64-char random string for session cookies |
-| `BASE_URL` | Yes | Public URL (used in emails, status page links) |
-| `BREVO_API_KEY` | For email | Brevo (Sendinblue) API key |
-| `FROM_EMAIL` | For email | Sender email address |
-| `DATA_RETENTION_DAYS` | No | Days of raw check results kept before cleanup (default: `365`) |
-| `PROBE_REGION` | No | Region identifier for check results (default: `us-east`) |
+|----------|----------|--------------|
+| `DATABASE_URL` | Yes | PostgreSQL connection string. TimescaleDB extension optional — see [Architecture](#architecture). |
+| `REDIS_URL` | Yes | Redis connection string (BullMQ queues + rate limiter). |
+| `BASE_URL` | Yes | Public URL. Every absolute link Beacon generates — status page URLs, email links, incident links — is built from this, not from request headers, so it must be correct before you invite anyone. |
+| `SESSION_SECRET` | Yes (per `.env.example`) | A 64-char random string. Currently unused by the app — session tokens are opaque, cryptographically random IDs looked up server-side in the `sessions` table, not signed against a secret. Still recommended to set to a strong random value in case that changes; harmless either way. |
+| `BREVO_API_KEY` | For email | Brevo (Sendinblue) API key, used for alert emails and subscriber notifications. |
+| `FROM_EMAIL` | For email | Sender address for outgoing email. |
+| `ALLOW_REGISTRATION` | No (default `false`) | Registration is open only until the first account exists — that account owns the install, with no seeded admin and no separate signup gate. Once an account exists, `/api/auth/register` returns `403` unless this is `true`. Set it to `true` to let anyone who can reach the URL sign up and create their own organization. |
+| `DATA_RETENTION_DAYS` | No (default `365`) | Days of raw `check_results` kept before cleanup. One retention window for the whole install; continuous aggregates aren't pruned by it. |
+| `PROBE_REGION` | No (default `us-east`) | Region identifier tagged onto check results. |
 
-## Project Structure
+### Advanced: worker tuning
 
-```
-src/
-  app/
-    (auth)/              # Login, register pages
-    (dashboard)/         # Dashboard pages (monitors, incidents, status pages, settings)
-    api/
-      auth/              # Login, register, me, logout
-      internal/          # Dashboard API (session auth)
-      v1/                # Public API (API key auth)
-      public/            # Unauthenticated endpoints (subscribe, confirm, status)
-    s/[slug]/            # Public status pages
-  components/
-    ui/                  # shadcn/ui primitives
-    dashboard/           # Dashboard shell, forms
-    monitors/            # Response chart, check history, actions
-    status-page/         # Component row, uptime bar, incident card
-  lib/
-    auth/                # Session + API key auth, password hashing
-    db/                  # Drizzle schema, migrations, connection
-    monitoring/
-      checks/            # HTTP, TCP, DNS, SSL, Ping check implementations
-      evaluator.ts       # Status transitions, auto-incidents, notification dispatch
-    notifications/       # Email, Slack, Discord, Webhook, Subscriber email
-    queue/               # BullMQ queue definitions
-    monitoring/
-      limits.ts          # MIN_CHECK_INTERVAL_SECONDS operational floor (not a plan gate)
-    rate-limit.ts        # Redis sliding-window rate limiter
-  worker/
-    index.ts             # BullMQ workers (monitor checks + notifications)
-    scheduler.ts         # Scheduling loop, heartbeat monitoring, data retention
-scripts/
-  migrate.ts             # DB migrations + TimescaleDB setup
-  seed.ts                # Demo data seeding
-public/
-  widget.js              # Embeddable status page widget
-```
+Not in `.env.example` (sane defaults baked in), but read directly by
+`src/worker/index.ts` if you need to tune throughput:
 
-## Database Schema
+| Variable | Default | Description |
+|----------|---------|--------------|
+| `WORKER_CONCURRENCY` | `10` | Concurrent `monitor-checks` jobs processed by the worker. |
+| `WORKER_RATE_LIMIT` | `50` | Max `monitor-checks` jobs per second. |
+| `NOTIFICATION_CONCURRENCY` | `5` | Concurrent `notifications` queue jobs. |
 
-### Tables
+## API & MCP
 
-| Table | Description |
-|-------|-------------|
-| `users` | Accounts with email/password auth |
-| `sessions` | Cookie-based sessions (30-day expiry) |
-| `monitors` | Monitor definitions (type, target, interval, thresholds) |
-| `check_results` | TimescaleDB hypertable -- time-series check data |
-| `status_pages` | Public status page configuration (branding, slug, custom domain) |
-| `status_page_monitors` | Join table linking monitors to status pages with display options |
-| `incidents` | Incident records with status and impact level |
-| `incident_updates` | Timeline entries for each incident |
-| `notification_channels` | User notification configs (email, Slack, Discord, webhook) |
-| `subscribers` | Email subscribers to status page updates |
-
-### Continuous Aggregates (TimescaleDB)
-
-- `hourly_uptime` -- per-hour uptime stats per monitor
-- `daily_uptime` -- per-day uptime stats per monitor
-
-### Data Retention
-
-One retention window for the whole install: `DATA_RETENTION_DAYS` (default 365) for raw check results, applied by `cleanupOldData()` in the scheduler. Continuous aggregates (`hourly_uptime`, `daily_uptime`) are not pruned.
-
-## Monitor Types
-
-| Type | Target Format | What It Checks |
-|------|--------------|----------------|
-| HTTP | `https://example.com/health` | Status code, response time, TLS expiry |
-| TCP | `host:port` | TCP connection success |
-| DNS | `example.com` | DNS resolution |
-| SSL | `example.com` | Certificate validity and expiry (degraded at 7-14 days) |
-| Ping | `1.2.3.4` | ICMP ping response time |
-| Heartbeat | (token-based) | External service POSTs to `/api/v1/heartbeat/[token]` |
-
-### Status Evaluation
-
-- **Up** -- check passed
-- **Degraded** -- HTTP response time > 80% of timeout, or SSL expiry 7-14 days
-- **Down** -- check failed, timeout, or SSL expired
-
-## Monitor Lifecycle
-
-```
-Create monitor (pending)
-    |
-    +---> Immediate check enqueued (BullMQ)
-    |         |
-    |     Worker performs check
-    |         |
-    |     Evaluator updates status
-    |         |
-    |     If status changed:
-    |       - Auto-create/resolve incidents
-    |       - Enqueue notifications
-    |
-    +---> Scheduler re-enqueues every intervalSeconds
-```
-
-## API Reference
-
-All v1 endpoints require a Bearer token (`Authorization: Bearer bk_...`). Generate an API key from Dashboard > Settings. There is one edition: every feature above (unlimited monitors, status pages, API access, custom domains, subscriber notifications) is available to every self-hosted install. The only hard limit is a 30-second minimum check interval, enforced by `src/lib/monitoring/limits.ts` to protect the scheduler loop.
-
-### Monitors
-
-```
-GET    /api/v1/monitors              # List monitors
-POST   /api/v1/monitors              # Create monitor
-GET    /api/v1/monitors/:id          # Get monitor
-PUT    /api/v1/monitors/:id          # Update monitor
-DELETE /api/v1/monitors/:id          # Delete monitor
-POST   /api/v1/monitors/:id/pause    # Pause monitor
-POST   /api/v1/monitors/:id/resume   # Resume monitor
-```
-
-### Incidents
-
-```
-GET    /api/v1/incidents             # List incidents
-POST   /api/v1/incidents             # Create incident
-GET    /api/v1/incidents/:id         # Get incident
-PUT    /api/v1/incidents/:id         # Update incident
-DELETE /api/v1/incidents/:id         # Delete incident
-POST   /api/v1/incidents/:id/updates # Add incident update
-```
-
-### Status Pages
-
-```
-GET    /api/v1/status-pages          # List status pages
-POST   /api/v1/status-pages          # Create status page
-```
-
-### Heartbeat
-
-```
-GET/POST  /api/v1/heartbeat/:token   # Send heartbeat ping
-```
-
-### Badge
-
-```
-GET    /api/v1/badge/:monitorId      # SVG uptime badge (public, no auth)
-```
-
-### Rate Limits
-
-60 requests per 60 seconds per API key. Rate limit headers included in responses.
-
-## Notification Channels
-
-| Channel | Config Fields | Notes |
-|---------|--------------|-------|
-| Email | `email` | Sent via Brevo with HTML template |
-| Slack | `webhookUrl` | Block Kit formatted messages |
-| Discord | `webhookUrl` | Embed formatted messages |
-| Webhook | `url`, `secret` (optional) | JSON POST with `X-Beacon-Signature` HMAC-SHA256 header |
-
-## Docker Deployment
-
-```bash
-# Build and run all services
-docker compose up -d
-
-# Or build just the app image
-docker build -t beacon-uptime .
-```
-
-The `docker-compose.yml` includes all five services:
-
-| Service | Port | Description |
-|---------|------|-------------|
-| `beacon-app` | 3100 | Next.js application |
-| `beacon-worker` | -- | BullMQ worker process |
-| `beacon-scheduler` | -- | Scheduling + heartbeat + cleanup |
-| `beacon-db` | 5433 | PostgreSQL 16 + TimescaleDB |
-| `beacon-redis` | 6380 | Redis 7 |
-
-## NPM Scripts
-
-```bash
-npm run dev           # Start Next.js dev server
-npm run build         # Build app + worker for production
-npm run start         # Start production server
-npm run worker        # Start BullMQ worker
-npm run scheduler     # Start scheduler
-npm run db:generate   # Generate Drizzle migrations
-npm run db:migrate    # Run migrations + TimescaleDB setup
-npm run db:push       # Push schema directly (no migration files)
-npm run db:studio     # Open Drizzle Studio
-npm run db:seed       # Seed demo data
-```
+- **REST API** (`/api/v1/*`) — Bearer API-key auth (`bk_...`, generate one
+  from Dashboard → Settings), 60 requests/60s per key. Monitors, incidents,
+  status pages, heartbeat pings, and a public SVG uptime badge. Full
+  reference: [docs/API.md](docs/API.md).
+- **MCP server** (`POST /api/mcp`) — the same API-key auth, exposed as a
+  stateless [Model Context Protocol](https://modelcontextprotocol.io)
+  endpoint for MCP-aware clients (Claude Desktop, Claude Code, Cursor, or
+  your own SDK client). 16 tools covering monitors, checks/analytics,
+  incidents (including `acknowledge_incident` and internal-only comment
+  updates), and status pages. Cross-org access is structurally impossible —
+  the org is bound to the server instance from the API key, never from a
+  tool argument. Client config examples and a `curl` walkthrough:
+  [docs/MCP.md](docs/MCP.md).
 
 ## Documentation
 
@@ -319,14 +306,33 @@ npm run db:seed       # Seed demo data
 |-----|---------|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture: processes, queues, schema |
 | [docs/API.md](docs/API.md) | REST API reference (`/api/v1/*`) |
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Production deployment via Docker Compose (self-hosted VM + NPM) |
-| [docs/UNRAID.md](docs/UNRAID.md) | All-in-one image for Unraid Community Applications (embedded Postgres + Redis, one container) |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | Sprint-by-sprint roadmap for the 2026-Q2/Q3 UI overhaul + 3 differentiators |
-| [docs/design/system.md](docs/design/system.md) | Current design system audit (Phase 0 baseline) |
-| [docs/design/handoff-2026-q2.md](docs/design/handoff-2026-q2.md) | Design direction brief for the redesign |
+| [docs/MCP.md](docs/MCP.md) | MCP server: tools, auth, client configuration |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Docker Compose production deployment |
+| [docs/UNRAID.md](docs/UNRAID.md) | All-in-one image for Unraid Community Applications |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Sprint-by-sprint roadmap |
+| [scripts/screenshots/](scripts/screenshots/) | How the screenshots in this README were captured, and how to re-shoot them |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup, tests, lint, PR process |
+| [SECURITY.md](SECURITY.md) | Reporting a vulnerability |
+
+## Contributing
+
+Beacon Uptime is open source under the [AGPL-3.0-only](LICENSE) license.
+Contributions require signing the [Contributor License Agreement](CLA.md) —
+a one-time click via the CLA bot on your first pull request — which grants
+the maintainer the right to distribute your contribution under other
+licenses too (what would let the same code ship in a possible future
+hosted edition, alongside the AGPL codebase). You keep the copyright to
+your own contribution either way. If that arrangement isn't for you, the
+AGPL still gives you every right to fork and build on the project
+independently.
+
+Dev setup, running tests, lint rules, and the PR checklist:
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Beacon Uptime is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only). If you run a modified version of Beacon over a network for others to use, the AGPL (section 13) requires you to make that version's source available to those users.
-
-Contributions require signing the [Contributor License Agreement](CLA.md) — see [CONTRIBUTING.md](CONTRIBUTING.md) for details. The CLA is what keeps a future official hosted edition possible without changing your rights to your own contribution.
+Beacon Uptime is licensed under the [GNU Affero General Public License
+v3.0](LICENSE) (AGPL-3.0-only). If you run a modified version of Beacon
+over a network for others to use, the AGPL (section 13) requires you to
+make that version's source available to those users — for example, a link
+in your dashboard or status page footer.
