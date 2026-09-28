@@ -235,7 +235,8 @@ export function MonitorTable({
       {sorted.length === 0 ? (
         <EmptyState filtered={filter !== "all"} />
       ) : (
-        <table className="w-full border-collapse">
+        <div className="overflow-x-auto">
+        <table className="w-full border-collapse min-w-[640px]">
           <thead>
             <tr>
               <th className="w-9 pl-4" />
@@ -283,6 +284,7 @@ export function MonitorTable({
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );

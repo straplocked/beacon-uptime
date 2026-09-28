@@ -22,6 +22,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 
 import { BeaconMark } from "@/components/brand/mark";
+import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -159,7 +160,7 @@ export function DashboardShell({
   const breadcrumbLabel = currentLabel(pathname);
 
   return (
-    <div className="min-h-screen bg-background text-foreground beacon-app">
+    <div className="min-h-screen bg-background text-foreground beacon-app pwa-safe-x">
       {/* Mobile sidebar overlay */}
       {mobileOpen && (
         <div
@@ -179,7 +180,7 @@ export function DashboardShell({
         aria-label="Primary navigation"
       >
         {/* Brand */}
-        <div className="flex items-center justify-between gap-2 h-14 px-4 border-b border-sidebar-border">
+        <div className="pwa-safe-top flex items-center justify-between gap-2 h-14 px-4 border-b border-sidebar-border">
           <Link href="/dashboard" className="flex items-center gap-2">
             <span className="text-primary"><BeaconMark size={22} /></span>
             <span className="font-display font-bold text-[13px] tracking-[0.18em] text-foreground">
@@ -187,7 +188,7 @@ export function DashboardShell({
             </span>
           </Link>
           <button
-            className="lg:hidden text-muted-foreground hover:text-foreground"
+            className="lg:hidden text-muted-foreground hover:text-foreground p-3.5 -m-3.5 flex items-center justify-center"
             onClick={() => setMobileOpen(false)}
             aria-label="Close navigation"
           >
@@ -262,7 +263,7 @@ export function DashboardShell({
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
                 className={cn(
-                  "group flex items-center gap-2.5 h-[30px] px-2.5 rounded-md text-[13px] font-normal text-sidebar-foreground transition-colors hover:bg-muted hover:text-foreground",
+                  "group flex items-center gap-2.5 h-11 lg:h-[30px] px-2.5 rounded-md text-[13px] font-normal text-sidebar-foreground transition-colors hover:bg-muted hover:text-foreground",
                   isActive &&
                     "bg-sidebar-accent text-foreground font-medium",
                 )}
@@ -285,7 +286,8 @@ export function DashboardShell({
         </nav>
 
         {/* Foot */}
-        <div className="border-t border-sidebar-border p-2.5 flex flex-col gap-2">
+        <div className="pwa-safe-bottom border-t border-sidebar-border p-2.5 flex flex-col gap-2">
+          <InstallPrompt />
           <button
             className="flex items-center gap-2 h-[30px] px-2 rounded-md border border-border bg-card text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             aria-label="Search (coming soon)"
@@ -342,11 +344,11 @@ export function DashboardShell({
       {/* Main column */}
       <div className="lg:pl-[var(--side-w)] flex flex-col min-h-screen">
         {/* Mobile top bar */}
-        <header className="lg:hidden sticky top-0 z-30 flex items-center h-14 px-4 border-b border-border bg-background gap-3">
+        <header className="pwa-safe-top lg:hidden sticky top-0 z-30 flex items-center h-14 px-4 border-b border-border bg-background gap-3">
           <button
             onClick={() => setMobileOpen(true)}
             aria-label="Open navigation"
-            className="text-muted-foreground"
+            className="text-muted-foreground flex items-center justify-center w-11 h-11 -ml-3"
           >
             <Menu className="h-5 w-5" />
           </button>
@@ -360,7 +362,7 @@ export function DashboardShell({
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             aria-label="Toggle theme"
-            className="w-7 h-7 rounded-md border border-border bg-card text-muted-foreground hover:text-foreground flex items-center justify-center"
+            className="w-11 h-11 -mr-2 rounded-md text-muted-foreground hover:text-foreground flex items-center justify-center"
           >
             {theme === "dark" ? (
               <Sun className="h-3.5 w-3.5" />
