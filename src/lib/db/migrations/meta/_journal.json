@@ -36,6 +36,13 @@
       "when": 1773523200000,
       "tag": "0004_organizations",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1778292418000,
+      "tag": "0005_sprint5_incident_collab",
+      "breakpoints": true
     }
   ]
 }
