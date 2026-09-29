@@ -81,6 +81,9 @@ export function DashboardShell({
     Array<{ id: string; name: string; role: string }>
   >([]);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
+  // Guards the DOM-mutating effect below from ever running with the
+  // hardcoded "dark" default above — see the effects further down.
+  const [themeResolved, setThemeResolved] = useState(false);
 
   const orgInitials = useMemo(
     () =>
@@ -113,14 +116,22 @@ export function DashboardShell({
         : "light");
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setTheme(initial);
+    setThemeResolved(true);
   }, []);
 
+  // Only touch the DOM once the real stored/system preference has been
+  // read — otherwise this fires on mount with the hardcoded "dark" default
+  // above (still in scope from the same commit, before the effect above
+  // has had a chance to update it) and briefly forces the "dark" class
+  // onto <html> even for a light-preferring visitor, a visible flash to
+  // dark before flashing back to light a tick later.
   useEffect(() => {
+    if (!themeResolved) return;
     document.documentElement.classList.toggle("dark", theme === "dark");
     if (typeof window !== "undefined") {
       localStorage.setItem("beacon-theme", theme);
     }
-  }, [theme]);
+  }, [theme, themeResolved]);
 
   useEffect(() => {
     if (orgSwitcherOpen && orgs.length === 0) {
