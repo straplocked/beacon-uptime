@@ -98,6 +98,13 @@ icons and a static offline page, so a lost connection shows a friendly
 responses or another user's authenticated pages, only static assets and
 build output.
 
+The same service worker can also show OS-level push notifications when a
+monitor goes down or recovers — tapping one opens the incident (or the
+monitor if there isn't one). Turn it on per device from **Settings →
+Notifications → Browser push**. It only appears once the server operator
+has configured VAPID keys (see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)) —
+otherwise the toggle is hidden rather than shown broken.
+
 ## Features
 
 - **6 monitor types** — HTTP, TCP, DNS, SSL, Ping, Heartbeat
@@ -106,7 +113,7 @@ build output.
   updates, **acknowledge state**, and **internal-only comments** that never
   publish to subscribers
 - **Multi-channel alerts** — Email (Brevo), Slack, Discord, Webhooks
-  (HMAC-signed)
+  (HMAC-signed), and optional **browser push** from the installed PWA
 - **Subscriber notifications** — visitors subscribe to status page updates
   via email
 - **REST API** — full v1 API with key-based auth and rate limiting ([docs/API.md](docs/API.md))
@@ -296,6 +303,8 @@ reads (`process.env.*` across `src/` and `scripts/`).
 | `ALLOW_REGISTRATION` | No (default `false`) | Registration is open only until the first account exists — that account owns the install, with no seeded admin and no separate signup gate. Once an account exists, `/api/auth/register` returns `403` unless this is `true`. Set it to `true` to let anyone who can reach the URL sign up and create their own organization. |
 | `DATA_RETENTION_DAYS` | No (default `365`) | Days of raw `check_results` kept before cleanup. One retention window for the whole install; continuous aggregates aren't pruned by it. |
 | `PROBE_REGION` | No (default `us-east`) | Region identifier tagged onto check results. |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | For browser push | Web Push VAPID key pair, generated with `npx web-push generate-vapid-keys --json`. Both must be set or browser push stays hidden in Settings — see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). |
+| `VAPID_SUBJECT` | No (default a generic `mailto:`) | Contact address/URL sent with each push request per the Web Push spec. |
 
 ### Advanced: worker tuning
 

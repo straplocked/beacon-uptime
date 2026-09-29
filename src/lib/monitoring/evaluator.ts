@@ -12,6 +12,7 @@ import {
 import { eq, and, isNull, ne } from "drizzle-orm";
 import { notificationQueue } from "@/lib/queue";
 import { clampRetryInterval, DEFAULT_RETRY_INTERVAL_SECONDS } from "@/lib/monitoring/limits";
+import { enqueuePushNotifications } from "@/lib/notifications/push-fanout";
 
 type MonitorStatus = "up" | "down" | "degraded" | "paused" | "pending";
 type CheckStatus = "up" | "down" | "degraded";
@@ -146,25 +147,34 @@ export async function processCheckResult(
   );
 
   // 4. Auto-incident management
+  let affectedIncidentIds: string[] = [];
   if (newStatus === "down" || newStatus === "degraded") {
-    await createAutoIncident(monitor, result);
+    affectedIncidentIds = await createAutoIncident(monitor, result);
   } else if (newStatus === "up" && (previousStatus === "down" || previousStatus === "degraded")) {
-    await resolveAutoIncidents(monitor);
+    affectedIncidentIds = await resolveAutoIncidents(monitor);
   }
 
   // 5. Trigger notification jobs
-  await enqueueNotifications(monitor, previousStatus, newStatus, result);
+  await enqueueNotifications(
+    monitor,
+    previousStatus,
+    newStatus,
+    result,
+    affectedIncidentIds[0] ?? null,
+  );
 }
 
 async function createAutoIncident(
   monitor: { id: string; organizationId: string; name: string; target: string; type: string },
   result: CheckResultData
-) {
+): Promise<string[]> {
   // Find status pages that include this monitor
   const linkedPages = await db
     .select({ statusPageId: statusPageMonitors.statusPageId })
     .from(statusPageMonitors)
     .where(eq(statusPageMonitors.monitorId, monitor.id));
+
+  const incidentIds: string[] = [];
 
   for (const { statusPageId } of linkedPages) {
     // Check if there's already an open incident for this monitor on this page
@@ -180,7 +190,10 @@ async function createAutoIncident(
       )
       .limit(1);
 
-    if (existingIncident.length > 0) continue;
+    if (existingIncident.length > 0) {
+      incidentIds.push(existingIncident[0].id);
+      continue;
+    }
 
     // Create auto-incident
     const impact = result.status === "down" ? "major" : "minor";
@@ -206,6 +219,7 @@ async function createAutoIncident(
     });
 
     console.log(`[evaluator] Auto-created incident for "${monitor.name}" on status page ${statusPageId}`);
+    incidentIds.push(incident.id);
 
     // Notify subscribers
     await enqueueSubscriberNotifications(
@@ -217,15 +231,19 @@ async function createAutoIncident(
         : `Automated alert: ${monitor.name} is ${result.status}.`
     );
   }
+
+  return incidentIds;
 }
 
 async function resolveAutoIncidents(
   monitor: { id: string; organizationId: string; name: string }
-) {
+): Promise<string[]> {
   const linkedPages = await db
     .select({ statusPageId: statusPageMonitors.statusPageId })
     .from(statusPageMonitors)
     .where(eq(statusPageMonitors.monitorId, monitor.id));
+
+  const incidentIds: string[] = [];
 
   for (const { statusPageId } of linkedPages) {
     const openIncidents = await db
@@ -256,21 +274,35 @@ async function resolveAutoIncidents(
       });
 
       console.log(`[evaluator] Auto-resolved incident ${incident.id}`);
+      incidentIds.push(incident.id);
     }
   }
+
+  return incidentIds;
 }
 
 async function enqueueNotifications(
   monitor: { id: string; organizationId: string; name: string; target: string; type: string },
   previousStatus: string,
   newStatus: string,
-  result: CheckResultData
+  result: CheckResultData,
+  incidentId: string | null
 ) {
   // Get user's notification channels
   const channels = await db
     .select()
     .from(notificationChannels)
     .where(eq(notificationChannels.organizationId, monitor.organizationId));
+
+  // Browser push (K1 802) fans out independently of org channels — it's
+  // per-user, not per-org, and a no-op when VAPID env vars aren't set.
+  await enqueuePushNotifications({
+    organizationId: monitor.organizationId,
+    monitorId: monitor.id,
+    monitorName: monitor.name,
+    status: newStatus as "up" | "down" | "degraded",
+    incidentId,
+  });
 
   if (channels.length === 0) return;
 

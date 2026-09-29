@@ -50,6 +50,13 @@
       "when": 1790557723752,
       "tag": "0006_confirm_assertions",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790564000000,
+      "tag": "0007_push_subscriptions",
+      "breakpoints": true
     }
   ]
 }

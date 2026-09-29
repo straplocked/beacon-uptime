@@ -406,6 +406,44 @@ export const notificationChannels = pgTable(
   (table) => [index("notification_channels_org_id_idx").on(table.organizationId)]
 );
 
+// ─── Push Subscriptions ─────────────────────────────────────────
+// K1 802 — browser push notifications from the installed PWA. One row per
+// (user, browser endpoint) pair: a user can have several devices/browsers
+// subscribed at once, each with its own endpoint. Delivery goes through the
+// existing `notifications` queue (see src/lib/notifications/push.ts and
+// src/lib/notifications/push-fanout.ts) and is skipped entirely if
+// VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY aren't configured.
+
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("push_subscriptions_user_endpoint_idx").on(
+      table.userId,
+      table.endpoint,
+    ),
+    index("push_subscriptions_org_id_idx").on(table.organizationId),
+  ]
+);
+
 // ─── Subscribers ────────────────────────────────────────────────
 
 export const subscribers = pgTable(
@@ -431,6 +469,7 @@ export const subscribers = pgTable(
 export const usersRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),
   organizationMembers: many(organizationMembers),
+  pushSubscriptions: many(pushSubscriptions),
 }));
 
 export const organizationsRelations = relations(organizations, ({ many }) => ({
@@ -440,6 +479,7 @@ export const organizationsRelations = relations(organizations, ({ many }) => ({
   statusPages: many(statusPages),
   incidents: many(incidents),
   notificationChannels: many(notificationChannels),
+  pushSubscriptions: many(pushSubscriptions),
 }));
 
 export const organizationMembersRelations = relations(
@@ -568,3 +608,17 @@ export const subscribersRelations = relations(subscribers, ({ one }) => ({
     references: [statusPages.id],
   }),
 }));
+
+export const pushSubscriptionsRelations = relations(
+  pushSubscriptions,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [pushSubscriptions.userId],
+      references: [users.id],
+    }),
+    organization: one(organizations, {
+      fields: [pushSubscriptions.organizationId],
+      references: [organizations.id],
+    }),
+  })
+);

@@ -14,6 +14,7 @@ import { Bell, ExternalLink, Key, Users } from "lucide-react";
 import Link from "next/link";
 
 import { ApiKeySection } from "@/components/dashboard/api-key-section";
+import { PushNotificationsSection } from "@/components/dashboard/push-notifications-section";
 import { getAuthContext } from "@/lib/auth";
 
 export default async function SettingsPage() {
@@ -145,6 +146,8 @@ export default async function SettingsPage() {
             Manage channels
             <ExternalLink className="h-3 w-3 opacity-60" />
           </Link>
+
+          <PushNotificationsSection />
         </Section>
 
         {/* Members */}
