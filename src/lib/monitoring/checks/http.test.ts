@@ -1,9 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
 import { performHttpCheck } from "./http";
+import { shutdownRegexWorkerPool } from "../regex-worker-pool";
 
 describe("performHttpCheck", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+  });
+
+  afterAll(async () => {
+    await shutdownRegexWorkerPool();
   });
 
   it("returns up when status matches expected", async () => {

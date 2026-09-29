@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterAll } from "vitest";
 
 import {
   validateAssertion,
@@ -9,6 +9,7 @@ import {
   MAX_ASSERTIONS_PER_MONITOR,
   type Assertion,
 } from "./assertions";
+import { shutdownRegexWorkerPool } from "./regex-worker-pool";
 
 describe("unsafeRegexReason (regex-safety validation)", () => {
   it("accepts an ordinary safe pattern", () => {
@@ -143,16 +144,20 @@ describe("resolveJsonPath", () => {
 });
 
 describe("evaluateAssertions", () => {
-  it("passes when body_contains matches", () => {
-    const result = evaluateAssertions(
+  afterAll(async () => {
+    await shutdownRegexWorkerPool();
+  });
+
+  it("passes when body_contains matches", async () => {
+    const result = await evaluateAssertions(
       [{ type: "body_contains", value: "healthy" }],
       { body: "status: healthy", headers: {} }
     );
     expect(result).toBeNull();
   });
 
-  it("fails when body_contains does not match", () => {
-    const result = evaluateAssertions(
+  it("fails when body_contains does not match", async () => {
+    const result = await evaluateAssertions(
       [{ type: "body_contains", value: "healthy" }],
       { body: "status: down", headers: {} }
     );
@@ -160,8 +165,8 @@ describe("evaluateAssertions", () => {
     expect(result?.message).toMatch(/does not contain/);
   });
 
-  it("fails when body_not_contains matches (forbidden text present)", () => {
-    const result = evaluateAssertions(
+  it("fails when body_not_contains matches (forbidden text present)", async () => {
+    const result = await evaluateAssertions(
       [{ type: "body_not_contains", value: "error" }],
       { body: "internal error occurred", headers: {} }
     );
@@ -169,16 +174,16 @@ describe("evaluateAssertions", () => {
     expect(result?.message).toMatch(/forbidden text/);
   });
 
-  it("passes body_regex when the pattern matches", () => {
-    const result = evaluateAssertions(
+  it("passes body_regex when the pattern matches", async () => {
+    const result = await evaluateAssertions(
       [{ type: "body_regex", pattern: "^\\{\\s*\"ok\"\\s*:\\s*true" }],
       { body: '{"ok": true, "extra": 1}', headers: {} }
     );
     expect(result).toBeNull();
   });
 
-  it("fails body_regex when the pattern does not match", () => {
-    const result = evaluateAssertions(
+  it("fails body_regex when the pattern does not match", async () => {
+    const result = await evaluateAssertions(
       [{ type: "body_regex", pattern: "^ready$" }],
       { body: "not ready", headers: {} }
     );
@@ -186,8 +191,8 @@ describe("evaluateAssertions", () => {
     expect(result?.message).toMatch(/does not match/);
   });
 
-  it("refuses to execute an unsafe body_regex even if it slipped through storage", () => {
-    const result = evaluateAssertions(
+  it("refuses to execute an unsafe body_regex even if it slipped through storage", async () => {
+    const result = await evaluateAssertions(
       [{ type: "body_regex", pattern: "(a+)+$" }],
       { body: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!", headers: {} }
     );
@@ -195,16 +200,28 @@ describe("evaluateAssertions", () => {
     expect(result?.message).toMatch(/rejected at check time/);
   });
 
-  it("passes header_equals on a case-insensitive header match", () => {
-    const result = evaluateAssertions(
+  it("times out a catastrophic pattern that slips past the shape heuristic", async () => {
+    // `(a?){25}b` isn't a nested-quantifier or quantified-alternation shape,
+    // so unsafeRegexReason() lets it through — this proves the worker-thread
+    // hard timeout (not the heuristic) is what actually stops it.
+    const result = await evaluateAssertions(
+      [{ type: "body_regex", pattern: "(a?){25}b" }],
+      { body: "a".repeat(25), headers: {} },
+    );
+    expect(result).not.toBeNull();
+    expect(result?.message).toMatch(/timed out/);
+  }, 10000);
+
+  it("passes header_equals on a case-insensitive header match", async () => {
+    const result = await evaluateAssertions(
       [{ type: "header_equals", header: "Content-Type", value: "application/json" }],
       { body: "{}", headers: { "content-type": "application/json" } }
     );
     expect(result).toBeNull();
   });
 
-  it("fails header_equals when the header is missing", () => {
-    const result = evaluateAssertions(
+  it("fails header_equals when the header is missing", async () => {
+    const result = await evaluateAssertions(
       [{ type: "header_equals", header: "X-Custom", value: "yes" }],
       { body: "", headers: {} }
     );
@@ -212,8 +229,8 @@ describe("evaluateAssertions", () => {
     expect(result?.message).toMatch(/missing/);
   });
 
-  it("fails header_equals when the value differs", () => {
-    const result = evaluateAssertions(
+  it("fails header_equals when the value differs", async () => {
+    const result = await evaluateAssertions(
       [{ type: "header_equals", header: "X-Custom", value: "yes" }],
       { body: "", headers: { "x-custom": "no" } }
     );
@@ -221,8 +238,8 @@ describe("evaluateAssertions", () => {
     expect(result?.message).toContain('"no"');
   });
 
-  it("passes json_path_equals on a matching nested value", () => {
-    const result = evaluateAssertions(
+  it("passes json_path_equals on a matching nested value", async () => {
+    const result = await evaluateAssertions(
       [{ type: "json_path_equals", path: "data.status", value: "ok" }],
       {
         body: '{"data":{"status":"ok"}}',
@@ -233,8 +250,8 @@ describe("evaluateAssertions", () => {
     expect(result).toBeNull();
   });
 
-  it("fails json_path_equals when the resolved value differs", () => {
-    const result = evaluateAssertions(
+  it("fails json_path_equals when the resolved value differs", async () => {
+    const result = await evaluateAssertions(
       [{ type: "json_path_equals", path: "data.status", value: "ok" }],
       {
         body: '{"data":{"status":"degraded"}}',
@@ -246,8 +263,8 @@ describe("evaluateAssertions", () => {
     expect(result?.message).toContain('"degraded"');
   });
 
-  it("fails json_path_equals with a clear message on malformed JSON", () => {
-    const result = evaluateAssertions(
+  it("fails json_path_equals with a clear message on malformed JSON", async () => {
+    const result = await evaluateAssertions(
       [{ type: "json_path_equals", path: "data.status", value: "ok" }],
       {
         body: "{not valid json",
@@ -259,16 +276,16 @@ describe("evaluateAssertions", () => {
     expect(result?.message).toMatch(/not valid JSON/);
   });
 
-  it("fails json_path_equals when jsonBody was never computed", () => {
-    const result = evaluateAssertions(
+  it("fails json_path_equals when jsonBody was never computed", async () => {
+    const result = await evaluateAssertions(
       [{ type: "json_path_equals", path: "data.status", value: "ok" }],
       { body: "{}", headers: {} }
     );
     expect(result).not.toBeNull();
   });
 
-  it("short-circuits on the first failing assertion, in order", () => {
-    const result = evaluateAssertions(
+  it("short-circuits on the first failing assertion, in order", async () => {
+    const result = await evaluateAssertions(
       [
         { type: "body_contains", value: "missing-one" },
         { type: "body_contains", value: "missing-two" },
@@ -278,7 +295,7 @@ describe("evaluateAssertions", () => {
     expect(result?.message).toMatch(/missing-one/);
   });
 
-  it("passes with an empty assertions list", () => {
-    expect(evaluateAssertions([], { body: "", headers: {} })).toBeNull();
+  it("passes with an empty assertions list", async () => {
+    expect(await evaluateAssertions([], { body: "", headers: {} })).toBeNull();
   });
 });

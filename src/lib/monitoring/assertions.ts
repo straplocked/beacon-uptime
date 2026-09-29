@@ -13,22 +13,28 @@
  * ─── Regex safety ──────────────────────────────────────────────────────
  * `body_regex` assertions run user-supplied patterns against attacker-
  * influenced response bodies, so a naive `new RegExp(pattern).test(body)`
- * is a ReDoS vector (catastrophic backtracking). Three independent guards:
+ * is a ReDoS vector (catastrophic backtracking). Layered guards:
  *
  *   1. Pattern length is capped (`MAX_REGEX_PATTERN_LENGTH`) — long patterns
  *      are both unnecessary for a keyword check and the raw material for
  *      exponential-blowup constructions.
  *   2. The scanned body is capped to `MAX_REGEX_SCAN_BYTES` (1 MB) — bounds
  *      the input size the pattern can backtrack over.
- *   3. `assertPatternIsSafe()` statically rejects the classic catastrophic
+ *   3. `unsafeRegexReason()` statically rejects the classic catastrophic
  *      shapes at validation time (nested quantifiers like `(a+)+`, `(a*)*`,
  *      and quantified alternation like `(a|a)+`) before the pattern is ever
  *      compiled against a real body. This is a heuristic, not a proof of
- *      linear-time execution for every possible pattern — it does not
- *      require a new regex-engine dependency (e.g. RE2) or a worker-thread
- *      sandbox, which was judged out of scope for this batch. Combined with
- *      the length/size caps above, it closes the realistic exploit shapes.
+ *      linear-time execution for every possible pattern.
+ *   4. The actual `.test()` call runs on the shared worker-thread pool in
+ *      `regex-worker-pool.ts`, under a hard timeout (`BODY_REGEX_TIMEOUT_MS`).
+ *      This is the real backstop for whatever the heuristic in (3) misses —
+ *      Chris chose this over swapping in a linear-time engine (e.g. RE2) to
+ *      avoid a native dependency. A pattern that doesn't finish in time
+ *      fails the assertion with a clear "timed out" message instead of
+ *      hanging the check pipeline.
  */
+
+import { runRegexWithTimeout } from "./regex-worker-pool";
 
 export type Assertion =
   | { type: "body_contains"; value: string }
@@ -40,6 +46,8 @@ export type Assertion =
 export const MAX_REGEX_PATTERN_LENGTH = 200;
 export const MAX_REGEX_SCAN_BYTES = 1_000_000; // 1 MB
 export const MAX_ASSERTIONS_PER_MONITOR = 20;
+/** Hard wall-clock timeout for a single `body_regex` evaluation (see regex-worker-pool.ts). */
+export const BODY_REGEX_TIMEOUT_MS = 250;
 
 export interface AssertionFailure {
   assertion: Assertion;
@@ -169,14 +177,14 @@ function stringifyForCompare(value: unknown): string {
  * null if all pass. `body` should already be capped by the caller if huge;
  * this function additionally caps what it scans for `body_regex`.
  */
-export function evaluateAssertions(
+export async function evaluateAssertions(
   assertions: Assertion[],
   ctx: {
     body: string;
     headers: Record<string, string>;
     jsonBody?: { ok: true; value: unknown } | { ok: false; error: string };
   },
-): AssertionFailure | null {
+): Promise<AssertionFailure | null> {
   for (const assertion of assertions) {
     switch (assertion.type) {
       case "body_contains": {
@@ -208,16 +216,24 @@ export function evaluateAssertions(
           };
         }
         const scanTarget = ctx.body.slice(0, MAX_REGEX_SCAN_BYTES);
-        let matched = false;
-        try {
-          matched = new RegExp(assertion.pattern).test(scanTarget);
-        } catch (err) {
+        const result = await runRegexWithTimeout(
+          assertion.pattern,
+          scanTarget,
+          BODY_REGEX_TIMEOUT_MS,
+        );
+        if (result.timedOut) {
           return {
             assertion,
-            message: `body_regex failed to run: ${err instanceof Error ? err.message : String(err)}`,
+            message: `body_regex timed out after ${BODY_REGEX_TIMEOUT_MS}ms — pattern may be catastrophically slow`,
           };
         }
-        if (!matched) {
+        if (result.error) {
+          return {
+            assertion,
+            message: `body_regex failed to run: ${result.error}`,
+          };
+        }
+        if (!result.matched) {
           return {
             assertion,
             message: `body does not match /${truncate(assertion.pattern)}/`,

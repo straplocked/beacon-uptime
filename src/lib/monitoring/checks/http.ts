@@ -166,7 +166,7 @@ async function evaluateHttpAssertions(
     }
   }
 
-  return evaluateAssertions(assertions, {
+  return await evaluateAssertions(assertions, {
     body: scannedBody,
     headers,
     jsonBody,
