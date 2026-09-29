@@ -75,7 +75,7 @@ interface PendingJob {
   timer: NodeJS.Timeout;
 }
 
-let poolWorkers: PoolWorker[] = [];
+const poolWorkers: PoolWorker[] = [];
 let nextJobId = 0;
 const pendingByWorker = new Map<Worker, PendingJob>();
 const queue: QueuedJob[] = [];

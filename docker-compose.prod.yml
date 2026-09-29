@@ -42,6 +42,7 @@ services:
       - FROM_EMAIL=${FROM_EMAIL:-noreply@beacon.local}
       - BASE_URL=${BASE_URL}
       - PROBE_REGION=${PROBE_REGION:-us-east}
+      - ALLOW_PRIVATE_TARGETS=${ALLOW_PRIVATE_TARGETS:-true}
     depends_on:
       db:
         condition: service_healthy

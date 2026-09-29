@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from "vitest";
 import { performHttpCheck } from "./http";
 import { shutdownRegexWorkerPool } from "../regex-worker-pool";
 
@@ -377,6 +377,65 @@ describe("performHttpCheck", () => {
       });
 
       expect(result.status).toBe("up");
+    });
+  });
+
+  describe("ALLOW_PRIVATE_TARGETS (SSRF guard, Vikunja 804)", () => {
+    const original = process.env.ALLOW_PRIVATE_TARGETS;
+
+    afterEach(() => {
+      if (original === undefined) delete process.env.ALLOW_PRIVATE_TARGETS;
+      else process.env.ALLOW_PRIVATE_TARGETS = original;
+    });
+
+    it("uses bare fetch and reaches a private target by default (unset)", async () => {
+      delete process.env.ALLOW_PRIVATE_TARGETS;
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response("ok", { status: 200 }));
+
+      const result = await performHttpCheck({
+        target: "http://192.168.1.1/",
+        method: "GET",
+        timeoutMs: 5000,
+        expectedStatusCode: 200,
+      });
+
+      expect(result.status).toBe("up");
+      expect(fetchSpy).toHaveBeenCalled();
+    });
+
+    it("blocks a private target when ALLOW_PRIVATE_TARGETS=false", async () => {
+      process.env.ALLOW_PRIVATE_TARGETS = "false";
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+      const result = await performHttpCheck({
+        target: "http://192.168.1.1/",
+        method: "GET",
+        timeoutMs: 5000,
+        expectedStatusCode: 200,
+      });
+
+      expect(result.status).toBe("down");
+      expect(result.errorMessage).toMatch(/private or reserved/);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it("still reaches a public target through safeFetch when ALLOW_PRIVATE_TARGETS=false", async () => {
+      process.env.ALLOW_PRIVATE_TARGETS = "false";
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response("ok", { status: 200 })
+      );
+
+      const result = await performHttpCheck({
+        target: "http://93.184.216.34/",
+        method: "GET",
+        timeoutMs: 5000,
+        expectedStatusCode: 200,
+      });
+
+      expect(result.status).toBe("up");
+      expect(result.statusCode).toBe(200);
     });
   });
 });

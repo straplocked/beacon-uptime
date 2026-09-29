@@ -26,6 +26,7 @@ services:
       - DATABASE_URL=postgresql://beacon:beacon@db:5432/beacon
       - REDIS_URL=redis://redis:6379
       - BREVO_API_KEY=${BREVO_API_KEY}
+      - ALLOW_PRIVATE_TARGETS=${ALLOW_PRIVATE_TARGETS:-true}
     depends_on:
       db:
         condition: service_healthy

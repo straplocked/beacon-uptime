@@ -41,11 +41,19 @@ export interface SafeFetchOptions {
   allowedContentTypes?: string[];
   /** Sent as the User-Agent header. */
   userAgent?: string;
+  /** HTTP method. Default "GET". */
+  method?: string;
+  /** Request body — only meaningful for methods that send one. */
+  body?: string;
+  /** Extra request headers, merged over (and able to override) the defaults. */
+  headers?: Record<string, string>;
 }
 
 export interface SafeFetchResult {
   body: Buffer;
   contentType: string | null;
+  /** Response headers, lowercased. */
+  headers: Record<string, string>;
   /** Final URL after redirects. */
   url: string;
   status: number;
@@ -260,6 +268,9 @@ export async function safeFetch(
     maxRedirects = 3,
     allowedContentTypes = [],
     userAgent = "BeaconUptime/1.0 (+palette-extractor)",
+    method = "GET",
+    body: requestBody,
+    headers: extraHeaders = {},
   } = opts;
 
   let current: URL;
@@ -289,10 +300,11 @@ export async function safeFetch(
     let res: Response;
     try {
       res = await fetch(current.toString(), {
-        method: "GET",
+        method,
         redirect: "manual",
         signal: controller.signal,
-        headers: { "User-Agent": userAgent, Accept: "image/*,*/*;q=0.8" },
+        headers: { "User-Agent": userAgent, Accept: "*/*", ...extraHeaders },
+        ...(requestBody !== undefined ? { body: requestBody } : {}),
       });
     } catch (err) {
       clearTimeout(timer);
@@ -355,10 +367,16 @@ export async function safeFetch(
         );
       }
 
+      const responseHeaders: Record<string, string> = {};
+      res.headers.forEach((value, key) => {
+        responseHeaders[key.toLowerCase()] = value;
+      });
+
       const body = await readCapped(res, maxBytes);
       return {
         body,
         contentType,
+        headers: responseHeaders,
         url: current.toString(),
         status: res.status,
       };

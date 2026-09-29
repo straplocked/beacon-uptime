@@ -1,4 +1,5 @@
 import * as dns from "dns/promises";
+import { assertTargetAllowed } from "@/lib/net/target-policy";
 
 export interface DnsCheckOptions {
   target: string; // hostname to resolve
@@ -16,6 +17,16 @@ export async function performDnsCheck(
 ): Promise<CheckResult> {
   const { target, timeoutMs } = options;
   const start = performance.now();
+
+  try {
+    await assertTargetAllowed(target);
+  } catch (err) {
+    return {
+      status: "down",
+      responseTimeMs: Math.round(performance.now() - start),
+      errorMessage: err instanceof Error ? err.message : "Target not allowed",
+    };
+  }
 
   return new Promise<CheckResult>((resolve) => {
     const timeout = setTimeout(() => {

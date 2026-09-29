@@ -88,6 +88,20 @@ On Unraid, set `BACKUP_PATH=/mnt/user/appdata/beacon/backups` to store backups o
 - Docker health checks are configured on the app container
 - The scheduler logs monitor check activity to stdout
 
+## Security: hosted / multi-tenant installs
+
+A single-tenant, self-hosted install commonly monitors its own LAN (a
+192.168.x.x router, a NAS, another container), so `ALLOW_PRIVATE_TARGETS`
+defaults to `true` and monitor targets are allowed to be private addresses.
+
+If you're operating Beacon as a hosted service where other people's monitor
+targets aren't trusted, set `ALLOW_PRIVATE_TARGETS=false` on the `worker`
+service's environment. Every check (http, tcp, dns, ssl, ping) then resolves
+its target first and refuses to run if it resolves to a private, loopback,
+link-local (cloud metadata), or otherwise reserved address — the same SSRF
+guard already used for user-supplied URLs (status-page favicon extraction).
+See `.env.prod.example` and `src/lib/net/target-policy.ts`.
+
 ## Resource Limits
 
 Default memory limits per container:

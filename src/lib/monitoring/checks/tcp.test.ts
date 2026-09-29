@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { performTcpCheck } from "./tcp";
 import { EventEmitter } from "events";
 
@@ -163,5 +163,55 @@ describe("performTcpCheck", () => {
     });
 
     expect(mockSocket.setTimeout).toHaveBeenCalledWith(7500);
+  });
+
+  describe("ALLOW_PRIVATE_TARGETS (SSRF guard, Vikunja 804)", () => {
+    const original = process.env.ALLOW_PRIVATE_TARGETS;
+
+    afterEach(() => {
+      if (original === undefined) delete process.env.ALLOW_PRIVATE_TARGETS;
+      else process.env.ALLOW_PRIVATE_TARGETS = original;
+    });
+
+    it("connects to a private target by default (unset)", async () => {
+      delete process.env.ALLOW_PRIVATE_TARGETS;
+      const mockSocket = createMockSocket();
+      setupMockSocket(mockSocket);
+      mockSocket.connect.mockImplementation((_port: number, _host: string, cb: () => void) => {
+        cb();
+        return mockSocket;
+      });
+
+      const result = await performTcpCheck({ target: "192.168.1.1:443", timeoutMs: 5000 });
+
+      expect(result.status).toBe("up");
+      expect(mockSocket.connect).toHaveBeenCalled();
+    });
+
+    it("blocks a private target when ALLOW_PRIVATE_TARGETS=false", async () => {
+      process.env.ALLOW_PRIVATE_TARGETS = "false";
+      const mockSocket = createMockSocket();
+      setupMockSocket(mockSocket);
+
+      const result = await performTcpCheck({ target: "192.168.1.1:443", timeoutMs: 5000 });
+
+      expect(result.status).toBe("down");
+      expect(result.errorMessage).toMatch(/private or reserved/);
+      expect(mockSocket.connect).not.toHaveBeenCalled();
+    });
+
+    it("still connects to a public target when ALLOW_PRIVATE_TARGETS=false", async () => {
+      process.env.ALLOW_PRIVATE_TARGETS = "false";
+      const mockSocket = createMockSocket();
+      setupMockSocket(mockSocket);
+      mockSocket.connect.mockImplementation((_port: number, _host: string, cb: () => void) => {
+        cb();
+        return mockSocket;
+      });
+
+      const result = await performTcpCheck({ target: "8.8.8.8:443", timeoutMs: 5000 });
+
+      expect(result.status).toBe("up");
+    });
   });
 });

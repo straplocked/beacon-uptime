@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { performDnsCheck } from "./dns";
 
 vi.mock("dns/promises", () => ({
   resolve: vi.fn(),
+  lookup: vi.fn(),
 }));
 
 import * as dns from "dns/promises";
@@ -86,5 +87,44 @@ describe("performDnsCheck", () => {
     });
 
     expect(result.status).toBe("up");
+  });
+
+  describe("ALLOW_PRIVATE_TARGETS (SSRF guard, Vikunja 804)", () => {
+    const original = process.env.ALLOW_PRIVATE_TARGETS;
+
+    afterEach(() => {
+      if (original === undefined) delete process.env.ALLOW_PRIVATE_TARGETS;
+      else process.env.ALLOW_PRIVATE_TARGETS = original;
+    });
+
+    it("resolves a private-address target by default (unset)", async () => {
+      delete process.env.ALLOW_PRIVATE_TARGETS;
+      vi.mocked(dns.resolve).mockResolvedValue(["192.168.1.1"]);
+
+      const result = await performDnsCheck({ target: "192.168.1.1", timeoutMs: 5000 });
+
+      expect(result.status).toBe("up");
+      expect(dns.resolve).toHaveBeenCalled();
+    });
+
+    it("blocks a private-address target when ALLOW_PRIVATE_TARGETS=false", async () => {
+      process.env.ALLOW_PRIVATE_TARGETS = "false";
+      vi.mocked(dns.resolve).mockClear();
+
+      const result = await performDnsCheck({ target: "192.168.1.1", timeoutMs: 5000 });
+
+      expect(result.status).toBe("down");
+      expect(result.errorMessage).toMatch(/private or reserved/);
+      expect(dns.resolve).not.toHaveBeenCalled();
+    });
+
+    it("still resolves a public target when ALLOW_PRIVATE_TARGETS=false", async () => {
+      process.env.ALLOW_PRIVATE_TARGETS = "false";
+      vi.mocked(dns.resolve).mockResolvedValue(["8.8.4.4"]);
+
+      const result = await performDnsCheck({ target: "8.8.8.8", timeoutMs: 5000 });
+
+      expect(result.status).toBe("up");
+    });
   });
 });

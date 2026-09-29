@@ -1,4 +1,5 @@
 import * as net from "net";
+import { assertTargetAllowed } from "@/lib/net/target-policy";
 
 export interface TcpCheckOptions {
   target: string; // host:port format
@@ -26,6 +27,16 @@ export async function performTcpCheck(
       status: "down",
       responseTimeMs: 0,
       errorMessage: `Invalid target format. Expected host:port, got "${target}"`,
+    };
+  }
+
+  try {
+    await assertTargetAllowed(host);
+  } catch (err) {
+    return {
+      status: "down",
+      responseTimeMs: 0,
+      errorMessage: err instanceof Error ? err.message : "Target not allowed",
     };
   }
 

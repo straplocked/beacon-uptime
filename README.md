@@ -296,6 +296,7 @@ reads (`process.env.*` across `src/` and `scripts/`).
 | `ALLOW_REGISTRATION` | No (default `false`) | Registration is open only until the first account exists — that account owns the install, with no seeded admin and no separate signup gate. Once an account exists, `/api/auth/register` returns `403` unless this is `true`. Set it to `true` to let anyone who can reach the URL sign up and create their own organization. |
 | `DATA_RETENTION_DAYS` | No (default `365`) | Days of raw `check_results` kept before cleanup. One retention window for the whole install; continuous aggregates aren't pruned by it. |
 | `PROBE_REGION` | No (default `us-east`) | Region identifier tagged onto check results. |
+| `ALLOW_PRIVATE_TARGETS` | No (default `true`, unset) | Unset/anything but `"false"` = monitors may target private/loopback/reserved addresses directly (self-hosted installs commonly monitor their own LAN). Set to exactly `false` to route every check (http, tcp, dns, ssl, ping) through the SSRF guard in `src/lib/net/safe-fetch.ts` instead, refusing targets that resolve to a private address — recommended for hosted/multi-tenant installs, where monitor targets are attacker-influenced. |
 
 ### Advanced: worker tuning
 
