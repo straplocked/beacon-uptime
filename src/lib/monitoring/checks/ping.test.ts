@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { performPingCheck, isValidPingTarget } from "./ping";
 
 vi.mock("child_process", () => ({
@@ -141,5 +141,50 @@ describe("performPingCheck", () => {
     for (const target of ["example.com", "192.168.1.1", "2606:4700:4700::1111", "nas-01.local"]) {
       expect(isValidPingTarget(target)).toBe(true);
     }
+  });
+
+  describe("ALLOW_PRIVATE_TARGETS (SSRF guard, Vikunja 804)", () => {
+    const original = process.env.ALLOW_PRIVATE_TARGETS;
+
+    afterEach(() => {
+      if (original === undefined) delete process.env.ALLOW_PRIVATE_TARGETS;
+      else process.env.ALLOW_PRIVATE_TARGETS = original;
+    });
+
+    it("pings a private target by default (unset)", async () => {
+      delete process.env.ALLOW_PRIVATE_TARGETS;
+      vi.mocked(execFile).mockImplementation(((_file: any, _args: any, _opts: any, cb: any) => {
+        cb(null, "64 bytes from 192.168.1.1: icmp_seq=1 ttl=64 time=1.0 ms", "");
+        return {} as any;
+      }) as any);
+
+      const result = await performPingCheck({ target: "192.168.1.1", timeoutMs: 5000 });
+
+      expect(result.status).toBe("up");
+      expect(execFile).toHaveBeenCalled();
+    });
+
+    it("blocks a private target when ALLOW_PRIVATE_TARGETS=false", async () => {
+      process.env.ALLOW_PRIVATE_TARGETS = "false";
+      vi.mocked(execFile).mockClear();
+
+      const result = await performPingCheck({ target: "192.168.1.1", timeoutMs: 5000 });
+
+      expect(result.status).toBe("down");
+      expect(result.errorMessage).toMatch(/private or reserved/);
+      expect(execFile).not.toHaveBeenCalled();
+    });
+
+    it("still pings a public target when ALLOW_PRIVATE_TARGETS=false", async () => {
+      process.env.ALLOW_PRIVATE_TARGETS = "false";
+      vi.mocked(execFile).mockImplementation(((_file: any, _args: any, _opts: any, cb: any) => {
+        cb(null, "64 bytes from 8.8.8.8: icmp_seq=1 ttl=117 time=12.8 ms", "");
+        return {} as any;
+      }) as any);
+
+      const result = await performPingCheck({ target: "8.8.8.8", timeoutMs: 5000 });
+
+      expect(result.status).toBe("up");
+    });
   });
 });

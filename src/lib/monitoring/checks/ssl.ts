@@ -1,4 +1,5 @@
 import * as tls from "tls";
+import { assertTargetAllowed } from "@/lib/net/target-policy";
 
 export interface SslCheckOptions {
   target: string; // hostname
@@ -23,6 +24,17 @@ export async function performSslCheck(
   const port = parts[1] ? parseInt(parts[1], 10) : 443;
 
   const start = performance.now();
+
+  try {
+    await assertTargetAllowed(host);
+  } catch (err) {
+    return {
+      status: "down",
+      responseTimeMs: Math.round(performance.now() - start),
+      errorMessage: err instanceof Error ? err.message : "Target not allowed",
+      tlsExpiry: null,
+    };
+  }
 
   return new Promise<CheckResult>((resolve) => {
     const socket = tls.connect(

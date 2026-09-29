@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { performSslCheck } from "./ssl";
 import { EventEmitter } from "events";
 
@@ -206,6 +206,56 @@ describe("performSslCheck", () => {
     await performSslCheck({
       target: "example.com",
       timeoutMs: 5000,
+    });
+  });
+
+  describe("ALLOW_PRIVATE_TARGETS (SSRF guard, Vikunja 804)", () => {
+    const original = process.env.ALLOW_PRIVATE_TARGETS;
+    const futureDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+
+    afterEach(() => {
+      if (original === undefined) delete process.env.ALLOW_PRIVATE_TARGETS;
+      else process.env.ALLOW_PRIVATE_TARGETS = original;
+    });
+
+    it("connects to a private target by default (unset)", async () => {
+      delete process.env.ALLOW_PRIVATE_TARGETS;
+      const mockSocket = createMockSocket();
+      vi.mocked(tls.connect).mockImplementation((_opts: any, cb: () => void) => {
+        setTimeout(cb, 0);
+        return mockSocket as any;
+      });
+      mockSocket.getPeerCertificate.mockReturnValue({ valid_to: futureDate.toUTCString() });
+
+      const result = await performSslCheck({ target: "192.168.1.1", timeoutMs: 5000 });
+
+      expect(result.status).toBe("up");
+      expect(tls.connect).toHaveBeenCalled();
+    });
+
+    it("blocks a private target when ALLOW_PRIVATE_TARGETS=false", async () => {
+      process.env.ALLOW_PRIVATE_TARGETS = "false";
+      vi.mocked(tls.connect).mockClear();
+
+      const result = await performSslCheck({ target: "192.168.1.1", timeoutMs: 5000 });
+
+      expect(result.status).toBe("down");
+      expect(result.errorMessage).toMatch(/private or reserved/);
+      expect(tls.connect).not.toHaveBeenCalled();
+    });
+
+    it("still connects to a public target when ALLOW_PRIVATE_TARGETS=false", async () => {
+      process.env.ALLOW_PRIVATE_TARGETS = "false";
+      const mockSocket = createMockSocket();
+      vi.mocked(tls.connect).mockImplementation((_opts: any, cb: () => void) => {
+        setTimeout(cb, 0);
+        return mockSocket as any;
+      });
+      mockSocket.getPeerCertificate.mockReturnValue({ valid_to: futureDate.toUTCString() });
+
+      const result = await performSslCheck({ target: "8.8.8.8", timeoutMs: 5000 });
+
+      expect(result.status).toBe("up");
     });
   });
 });

@@ -7,6 +7,7 @@ import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { withRateLimit } from "@/lib/rate-limit";
 import {
+  clampCheckInterval,
   clampConfirmationCount,
   clampRetryInterval,
 } from "@/lib/monitoring/limits";
@@ -124,7 +125,9 @@ export async function PATCH(
   const updateData: Record<string, unknown> = { updatedAt: new Date() };
 
   if (data.name !== undefined) updateData.name = data.name;
-  if (data.intervalSeconds !== undefined) updateData.intervalSeconds = data.intervalSeconds;
+  if (data.intervalSeconds !== undefined) {
+    updateData.intervalSeconds = clampCheckInterval(data.intervalSeconds);
+  }
   if (data.timeoutMs !== undefined) updateData.timeoutMs = data.timeoutMs;
   if (data.expectedStatusCode !== undefined) updateData.expectedStatusCode = data.expectedStatusCode;
   if (data.method !== undefined) updateData.method = data.method;

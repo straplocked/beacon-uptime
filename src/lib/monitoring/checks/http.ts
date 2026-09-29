@@ -3,6 +3,8 @@ import {
   MAX_REGEX_SCAN_BYTES,
   type Assertion,
 } from "@/lib/monitoring/assertions";
+import { safeFetch, SafeFetchError } from "@/lib/net/safe-fetch";
+import { allowPrivateTargets } from "@/lib/net/target-policy";
 
 export interface HttpCheckOptions {
   target: string;
@@ -35,30 +37,59 @@ export async function performHttpCheck(
     assertions,
   } = options;
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
   const start = performance.now();
 
-  try {
-    const fetchOptions: RequestInit = {
-      method,
-      signal: controller.signal,
-      headers: {
-        "User-Agent": "Beacon-Monitor/1.0",
-        ...headers,
-      },
-      redirect: "follow",
-    };
+  // ALLOW_PRIVATE_TARGETS=false routes the check through safeFetch, which
+  // resolves the target (and re-validates every redirect hop) and refuses
+  // private/loopback/reserved addresses — see src/lib/net/target-policy.ts.
+  // That guard manages its own timeout internally, so only the default,
+  // unguarded path needs its own AbortController.
+  const useSafeFetch = !allowPrivateTargets();
+  const controller = useSafeFetch ? null : new AbortController();
+  const timeout = controller
+    ? setTimeout(() => controller.abort(), timeoutMs)
+    : null;
 
-    if (body && method === "POST") {
-      fetchOptions.body = body;
+  try {
+    let response: Response;
+
+    if (useSafeFetch) {
+      const safe = await safeFetch(target, {
+        method,
+        headers: { "User-Agent": "Beacon-Monitor/1.0", ...headers },
+        body: body && method === "POST" ? body : undefined,
+        timeoutMs,
+        allowedContentTypes: [], // monitor checks may assert against any content type
+      });
+      // Response's DOM-lib BodyInit type doesn't structurally accept a
+      // Node Buffer under this project's Next.js tsconfig (it does under
+      // the worker's own, DOM-less one) — an explicit Uint8Array view
+      // satisfies both.
+      response = new Response(new Uint8Array(safe.body), {
+        status: safe.status,
+        headers: safe.headers,
+      });
+    } else {
+      const fetchOptions: RequestInit = {
+        method,
+        signal: controller!.signal,
+        headers: {
+          "User-Agent": "Beacon-Monitor/1.0",
+          ...headers,
+        },
+        redirect: "follow",
+      };
+
+      if (body && method === "POST") {
+        fetchOptions.body = body;
+      }
+
+      response = await fetch(target, fetchOptions);
     }
 
-    const response = await fetch(target, fetchOptions);
     const responseTimeMs = Math.round(performance.now() - start);
 
-    clearTimeout(timeout);
+    if (timeout) clearTimeout(timeout);
 
     // Extract TLS expiry if available (Node.js specific)
     const tlsExpiry: Date | null = null;
@@ -106,11 +137,16 @@ export async function performHttpCheck(
       tlsExpiry,
     };
   } catch (error) {
-    clearTimeout(timeout);
+    if (timeout) clearTimeout(timeout);
     const responseTimeMs = Math.round(performance.now() - start);
 
     let errorMessage = "Unknown error";
-    if (error instanceof Error) {
+    if (error instanceof SafeFetchError) {
+      errorMessage =
+        error.code === "timeout"
+          ? `Request timeout after ${timeoutMs}ms`
+          : error.message;
+    } else if (error instanceof Error) {
       if (error.name === "AbortError") {
         errorMessage = `Request timeout after ${timeoutMs}ms`;
       } else {
@@ -166,7 +202,7 @@ async function evaluateHttpAssertions(
     }
   }
 
-  return evaluateAssertions(assertions, {
+  return await evaluateAssertions(assertions, {
     body: scannedBody,
     headers,
     jsonBody,

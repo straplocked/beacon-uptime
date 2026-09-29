@@ -305,6 +305,7 @@ reads (`process.env.*` across `src/` and `scripts/`).
 | `PROBE_REGION` | No (default `us-east`) | Region identifier tagged onto check results. |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | For browser push | Web Push VAPID key pair, generated with `npx web-push generate-vapid-keys --json`. Both must be set or browser push stays hidden in Settings — see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). |
 | `VAPID_SUBJECT` | No (default a generic `mailto:`) | Contact address/URL sent with each push request per the Web Push spec. |
+| `ALLOW_PRIVATE_TARGETS` | No (default `true`, unset) | Unset/anything but `"false"` = monitors may target private/loopback/reserved addresses directly (self-hosted installs commonly monitor their own LAN). Set to exactly `false` to route every check (http, tcp, dns, ssl, ping) through the SSRF guard in `src/lib/net/safe-fetch.ts` instead, refusing targets that resolve to a private address — recommended for hosted/multi-tenant installs, where monitor targets are attacker-influenced. |
 
 ### Advanced: worker tuning
 
