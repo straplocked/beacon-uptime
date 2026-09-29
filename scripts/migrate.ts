@@ -17,6 +17,64 @@ function errorCause(e: unknown): unknown {
   return e instanceof Error ? (e as Error & { cause?: unknown }).cause : undefined;
 }
 
+/**
+ * Create/update a TimescaleDB retention policy on `hypertableName` so it
+ * matches `retentionDays`, following DATA_RETENTION_DAYS (see the fix in
+ * Vikunja 766 for `check_results`, which this generalizes — Vikunja 806).
+ *
+ * `add_retention_policy(..., if_not_exists => TRUE)` only skips creation
+ * when a policy already exists — it does NOT update the interval on one
+ * that does. So a policy created under an older default (or the previous
+ * hardcoded 1-year `hourly_uptime` policy) would otherwise be stuck at
+ * that interval forever regardless of DATA_RETENTION_DAYS. Compare the
+ * existing policy's interval against the configured window and only drop +
+ * recreate it on a mismatch.
+ *
+ * Only ever called from inside the `if (timescale)` branch in `main()` —
+ * on a plain-PostgreSQL install (no TimescaleDB) this function, and
+ * retention generally, is skipped entirely; the scheduler's
+ * `DATA_RETENTION_DAYS` cleanup is what prunes `check_results` there, and
+ * continuous aggregates don't exist without TimescaleDB in the first place.
+ */
+async function ensureRetentionPolicy(
+  db: ReturnType<typeof drizzle>,
+  hypertableName: "check_results" | "hourly_uptime",
+  retentionDays: number,
+): Promise<void> {
+  const existing = await db.execute<{ job_id: number; drop_after: string | null }>(sql`
+    SELECT job_id, config ->> 'drop_after' AS drop_after
+    FROM timescaledb_information.jobs
+    WHERE proc_name = 'policy_retention'
+      AND hypertable_name = ${hypertableName}
+  `);
+
+  let matches = false;
+  if (existing.length > 0 && existing[0].drop_after) {
+    const cmp = await db.execute<{ matches: boolean }>(sql`
+      SELECT (${existing[0].drop_after}::interval = (INTERVAL '1 day' * ${retentionDays})) AS matches
+    `);
+    matches = Boolean(cmp[0]?.matches);
+  }
+
+  if (existing.length > 0 && !matches) {
+    console.log(
+      `[migrate] Existing ${hypertableName} retention policy (${existing[0].drop_after}) doesn't match DATA_RETENTION_DAYS=${retentionDays}d; replacing`
+    );
+    await db.execute(
+      sql`SELECT remove_retention_policy(${sql.raw(`'${hypertableName}'`)}, if_exists => TRUE)`
+    );
+  }
+
+  if (existing.length === 0 || !matches) {
+    await db.execute(
+      sql`SELECT add_retention_policy(${sql.raw(`'${hypertableName}'`)}, INTERVAL '1 day' * ${retentionDays}, if_not_exists => TRUE)`
+    );
+    console.log(`[migrate] ${hypertableName} retention policy set (${retentionDays} days)`);
+  } else {
+    console.log(`[migrate] ${hypertableName} retention policy already matches DATA_RETENTION_DAYS=${retentionDays}d`);
+  }
+}
+
 async function main() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -135,58 +193,20 @@ async function main() {
       }
     }
 
-    // Step 5: Retention policies
+    // Step 5: Retention policies — both check_results (raw checks) and the
+    // hourly_uptime continuous aggregate follow the same DATA_RETENTION_DAYS
+    // window (Vikunja 766, generalized to hourly_uptime in Vikunja 806).
     console.log("[migrate] Setting up retention policies...");
+    const retentionDays = getRetentionDays();
+
     try {
-      const retentionDays = getRetentionDays();
-
-      // add_retention_policy's if_not_exists only skips creation when a
-      // policy already exists — it does NOT update the interval on one
-      // that does. Older installs (and any fresh install before this fix)
-      // got a policy hardcoded to 30 days regardless of
-      // DATA_RETENTION_DAYS, so if_not_exists alone would leave them stuck
-      // at 30 days forever. Compare the existing policy's interval (if
-      // any) against the configured retention window and only drop +
-      // recreate it on a mismatch.
-      const existing = await db.execute<{ job_id: number; drop_after: string | null }>(sql`
-        SELECT job_id, config ->> 'drop_after' AS drop_after
-        FROM timescaledb_information.jobs
-        WHERE proc_name = 'policy_retention'
-          AND hypertable_name = 'check_results'
-      `);
-
-      let matches = false;
-      if (existing.length > 0 && existing[0].drop_after) {
-        const cmp = await db.execute<{ matches: boolean }>(sql`
-          SELECT (${existing[0].drop_after}::interval = (INTERVAL '1 day' * ${retentionDays})) AS matches
-        `);
-        matches = Boolean(cmp[0]?.matches);
-      }
-
-      if (existing.length > 0 && !matches) {
-        console.log(
-          `[migrate] Existing check_results retention policy (${existing[0].drop_after}) doesn't match DATA_RETENTION_DAYS=${retentionDays}d; replacing`
-        );
-        await db.execute(sql`SELECT remove_retention_policy('check_results', if_exists => TRUE)`);
-      }
-
-      if (existing.length === 0 || !matches) {
-        await db.execute(
-          sql`SELECT add_retention_policy('check_results', INTERVAL '1 day' * ${retentionDays}, if_not_exists => TRUE)`
-        );
-        console.log(`[migrate] check_results retention policy set (${retentionDays} days)`);
-      } else {
-        console.log(`[migrate] check_results retention policy already matches DATA_RETENTION_DAYS=${retentionDays}d`);
-      }
+      await ensureRetentionPolicy(db, "check_results", retentionDays);
     } catch (e: unknown) {
       console.warn("[migrate] Retention policy note:", errorMessage(e));
     }
 
     try {
-      await db.execute(
-        sql`SELECT add_retention_policy('hourly_uptime', INTERVAL '1 year', if_not_exists => TRUE)`
-      );
-      console.log("[migrate] hourly_uptime retention policy set (1 year)");
+      await ensureRetentionPolicy(db, "hourly_uptime", retentionDays);
     } catch (e: unknown) {
       console.warn("[migrate] Retention policy note:", errorMessage(e));
     }

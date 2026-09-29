@@ -61,7 +61,11 @@ export async function performHttpCheck(
         timeoutMs,
         allowedContentTypes: [], // monitor checks may assert against any content type
       });
-      response = new Response(safe.body, {
+      // Response's DOM-lib BodyInit type doesn't structurally accept a
+      // Node Buffer under this project's Next.js tsconfig (it does under
+      // the worker's own, DOM-less one) — an explicit Uint8Array view
+      // satisfies both.
+      response = new Response(new Uint8Array(safe.body), {
         status: safe.status,
         headers: safe.headers,
       });

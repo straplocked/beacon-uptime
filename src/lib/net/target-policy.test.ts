@@ -64,13 +64,13 @@ describe("assertTargetAllowed", () => {
 
   it("rejects a hostname that resolves to a private address when disallowed", async () => {
     process.env.ALLOW_PRIVATE_TARGETS = "false";
-    vi.mocked(lookup).mockResolvedValue([{ address: "10.0.0.5", family: 4 }]);
+    vi.mocked(lookup).mockResolvedValue([{ address: "10.0.0.5", family: 4 }] as never);
     await expect(assertTargetAllowed("internal.example")).rejects.toThrow(SafeFetchError);
   });
 
   it("allows a hostname that resolves to a public address when disallowed", async () => {
     process.env.ALLOW_PRIVATE_TARGETS = "false";
-    vi.mocked(lookup).mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
+    vi.mocked(lookup).mockResolvedValue([{ address: "93.184.216.34", family: 4 }] as never);
     await expect(assertTargetAllowed("example.com")).resolves.toBeUndefined();
   });
 });
