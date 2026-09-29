@@ -24,6 +24,7 @@ import { notFound } from "next/navigation";
 import { CheckHistory } from "@/components/monitors/check-history";
 import { EditableName } from "@/components/monitors/editable-name";
 import { MonitorActions } from "@/components/monitors/monitor-actions";
+import { MonitorConfigSection } from "@/components/monitors/monitor-config-section";
 import {
   ResponseChart,
   type IncidentBand,
@@ -39,6 +40,7 @@ import {
   type MonitorStatus,
 } from "@/components/dashboard/status-indicators";
 import { getAuthContext } from "@/lib/auth";
+import { canEditResources } from "@/lib/auth/permissions";
 import { db } from "@/lib/db";
 import {
   checkResults,
@@ -447,61 +449,76 @@ export default async function MonitorDetailPage({
           </RailCard>
 
           <RailCard title="Configuration">
-            <ConfigRow
-              icon={<Clock className="h-3 w-3" />}
-              label="Interval"
-              value={`${monitor.intervalSeconds}s`}
-            />
-            <ConfigRow
-              icon={<Cpu className="h-3 w-3" />}
-              label="Timeout"
-              value={`${monitor.timeoutMs}ms`}
-            />
-            {monitor.method && (
+            <MonitorConfigSection
+              monitorId={monitor.id}
+              monitorType={monitor.type}
+              canEdit={canEditResources(ctx.role)}
+              initial={{
+                intervalSeconds: monitor.intervalSeconds,
+                timeoutMs: monitor.timeoutMs,
+                method: monitor.method,
+                expectedStatusCode: monitor.expectedStatusCode,
+                confirmationCount: monitor.confirmationCount,
+                retryIntervalSeconds: monitor.retryIntervalSeconds,
+                assertions: monitor.assertions,
+              }}
+            >
+              <ConfigRow
+                icon={<Clock className="h-3 w-3" />}
+                label="Interval"
+                value={`${monitor.intervalSeconds}s`}
+              />
+              <ConfigRow
+                icon={<Cpu className="h-3 w-3" />}
+                label="Timeout"
+                value={`${monitor.timeoutMs}ms`}
+              />
+              {monitor.method && (
+                <ConfigRow
+                  icon={<Globe className="h-3 w-3" />}
+                  label="Method"
+                  value={monitor.method}
+                />
+              )}
+              {monitor.expectedStatusCode != null && (
+                <ConfigRow
+                  icon={<Globe className="h-3 w-3" />}
+                  label="Expect"
+                  value={`${monitor.expectedStatusCode}`}
+                />
+              )}
               <ConfigRow
                 icon={<Globe className="h-3 w-3" />}
-                label="Method"
-                value={monitor.method}
+                label="Regions"
+                value={monitor.regions.join(", ")}
               />
-            )}
-            {monitor.expectedStatusCode != null && (
               <ConfigRow
-                icon={<Globe className="h-3 w-3" />}
-                label="Expect"
-                value={`${monitor.expectedStatusCode}`}
+                icon={<Clock className="h-3 w-3" />}
+                label="Confirmations"
+                value={
+                  monitor.confirmationCount <= 1
+                    ? "1 (immediate)"
+                    : `${monitor.confirmationCount} in a row`
+                }
               />
-            )}
-            <ConfigRow
-              icon={<Globe className="h-3 w-3" />}
-              label="Regions"
-              value={monitor.regions.join(", ")}
-            />
-            <ConfigRow
-              icon={<Clock className="h-3 w-3" />}
-              label="Confirmations"
-              value={
-                monitor.confirmationCount <= 1
-                  ? "1 (immediate)"
-                  : `${monitor.confirmationCount} in a row`
-              }
-            />
-            <ConfigRow
-              icon={<Clock className="h-3 w-3" />}
-              label="Retry interval"
-              value={`${monitor.retryIntervalSeconds}s`}
-            />
-            {monitor.type === "http" && (
               <ConfigRow
-                icon={<Globe className="h-3 w-3" />}
-                label="Assertions"
-                value={`${monitor.assertions?.length ?? 0}`}
+                icon={<Clock className="h-3 w-3" />}
+                label="Retry interval"
+                value={`${monitor.retryIntervalSeconds}s`}
               />
-            )}
-            <ConfigRow
-              icon={monitor.isPaused ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
-              label="State"
-              value={monitor.isPaused ? "Paused" : "Active"}
-            />
+              {monitor.type === "http" && (
+                <ConfigRow
+                  icon={<Globe className="h-3 w-3" />}
+                  label="Assertions"
+                  value={`${monitor.assertions?.length ?? 0}`}
+                />
+              )}
+              <ConfigRow
+                icon={monitor.isPaused ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+                label="State"
+                value={monitor.isPaused ? "Paused" : "Active"}
+              />
+            </MonitorConfigSection>
           </RailCard>
         </aside>
       </div>

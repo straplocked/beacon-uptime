@@ -102,3 +102,53 @@ async function networkFirstNavigation(request) {
     return offline ?? Response.error();
   }
 }
+
+// ─── Push notifications (K1 802) ───────────────────────────────────
+//
+// The push payload is JSON built server-side in
+// src/lib/notifications/push-fanout.ts: { title, body, url, tag? }.
+// `url` is an absolute deep link — the incident thread when the event has
+// one, otherwise the monitor detail page.
+
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch {
+    return;
+  }
+
+  const title = payload.title || "Beacon Uptime";
+  const options = {
+    body: payload.body || "",
+    icon: "/icons/icon-192.png",
+    badge: "/icons/icon-192.png",
+    tag: payload.tag,
+    data: { url: payload.url },
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data && event.notification.data.url;
+  if (!url) return;
+
+  event.waitUntil(
+    (async () => {
+      const clients = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+      for (const client of clients) {
+        if (client.url === url && "focus" in client) {
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(url);
+    })(),
+  );
+});

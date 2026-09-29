@@ -12,6 +12,9 @@ services:
       - BASE_URL=${BASE_URL}
       - SESSION_SECRET=${SESSION_SECRET}
       - FROM_EMAIL=${FROM_EMAIL:-noreply@beacon.local}
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
+      - VAPID_SUBJECT=${VAPID_SUBJECT:-mailto:alerts@beacon.local}
     depends_on:
       db:
         condition: service_healthy
@@ -42,6 +45,9 @@ services:
       - FROM_EMAIL=${FROM_EMAIL:-noreply@beacon.local}
       - BASE_URL=${BASE_URL}
       - PROBE_REGION=${PROBE_REGION:-us-east}
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
+      - VAPID_SUBJECT=${VAPID_SUBJECT:-mailto:alerts@beacon.local}
     depends_on:
       db:
         condition: service_healthy

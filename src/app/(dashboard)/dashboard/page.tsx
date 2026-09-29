@@ -19,12 +19,14 @@ import { StatCards, type DashboardStats } from "./_components/stat-cards";
 
 import { getAuthContext } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { formatAgo, resolveAcknowledgedBy } from "@/lib/dashboard/incident-summary";
 import {
   checkResults,
   incidents,
   incidentUpdates,
   monitors,
   statusPages,
+  users,
 } from "@/lib/db/schema";
 import type {
   IncidentSeverity,
@@ -33,14 +35,6 @@ import type {
 } from "@/components/dashboard/status-indicators";
 
 // ─── Helpers ────────────────────────────────────────────────────
-
-function formatAgo(date: Date): string {
-  const diff = (Date.now() - date.getTime()) / 1000;
-  if (diff < 60) return `${Math.floor(diff)}s`;
-  if (diff < 3600) return `${Math.floor(diff / 60)} min`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-  return `${Math.floor(diff / 86400)}d`;
-}
 
 function relAgo(date: Date): string {
   const diff = (Date.now() - date.getTime()) / 1000;
@@ -311,6 +305,11 @@ export default async function DashboardPage() {
       createdAt: incidents.createdAt,
       resolvedAt: incidents.resolvedAt,
       statusPageId: incidents.statusPageId,
+      // K1 807: these two were missing, so `activeIncidentSummary.acknowledgedBy`
+      // was always undefined below and the banner showed "Unacknowledged"
+      // regardless of actual state.
+      acknowledgedAt: incidents.acknowledgedAt,
+      acknowledgedByUserId: incidents.acknowledgedByUserId,
     })
     .from(incidents)
     .where(
@@ -371,13 +370,31 @@ export default async function DashboardPage() {
       .select({ id: incidentUpdates.id })
       .from(incidentUpdates)
       .where(eq(incidentUpdates.incidentId, activeIncident.id));
+
+    // K1 807: resolve the acknowledger's name so the banner matches the
+    // incident detail page instead of always reading "Unacknowledged".
+    let acknowledgerName: string | null = null;
+    if (activeIncident.acknowledgedByUserId) {
+      const [acker] = await db
+        .select({ name: users.name })
+        .from(users)
+        .where(eq(users.id, activeIncident.acknowledgedByUserId))
+        .limit(1);
+      acknowledgerName = acker?.name ?? null;
+    }
+
     activeIncidentSummary = {
       id: activeIncident.id,
       title: activeIncident.title,
       severity: toSeverity(activeIncident.impact),
       state: toIncidentState(activeIncident.status),
       pageName: page?.name ?? "Unknown page",
-      openedAgo: formatAgo(activeIncident.createdAt),
+      openedAgo: formatAgo(activeIncident.createdAt, now),
+      acknowledgedBy: resolveAcknowledgedBy(
+        activeIncident.acknowledgedAt,
+        acknowledgerName,
+        now,
+      ),
       commentCount: updates.length,
       mentionCount: 0,
     };

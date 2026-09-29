@@ -14,6 +14,11 @@ import { sendSlackNotification } from "../lib/notifications/slack";
 import { sendDiscordNotification } from "../lib/notifications/discord";
 import { sendWebhookNotification } from "../lib/notifications/webhook";
 import { sendIncidentNotificationEmail } from "../lib/notifications/subscriber-email";
+import {
+  isGoneStatus,
+  sendPushNotification,
+  PushSendError,
+} from "../lib/notifications/push";
 
 // ─── Setup ──────────────────────────────────────────────────────
 
@@ -180,6 +185,31 @@ const notificationWorker = new Worker(
         data.statusPageUrl,
         data.unsubscribeUrl
       );
+      return;
+    }
+
+    // Handle browser push notification jobs (K1 802)
+    if (data.type === "push-notification") {
+      console.log(`[worker] Sending push notification to ${data.endpoint}`);
+      try {
+        await sendPushNotification(
+          { endpoint: data.endpoint, p256dh: data.p256dh, auth: data.auth },
+          data.payload
+        );
+      } catch (err) {
+        if (err instanceof PushSendError && isGoneStatus(err.statusCode)) {
+          // Subscription is dead (browser unsubscribed, endpoint expired,
+          // etc.) — prune it so we stop trying, instead of retrying forever.
+          await db
+            .delete(schema.pushSubscriptions)
+            .where(eq(schema.pushSubscriptions.id, data.subscriptionId));
+          console.log(
+            `[worker] Pruned dead push subscription ${data.subscriptionId} (status ${err.statusCode})`
+          );
+          return;
+        }
+        throw err;
+      }
       return;
     }
 

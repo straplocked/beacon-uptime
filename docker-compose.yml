@@ -11,6 +11,9 @@ services:
       - BREVO_API_KEY=${BREVO_API_KEY}
       - BASE_URL=https://beacon.pluginsynthesis.com
       - SESSION_SECRET=${SESSION_SECRET}
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
+      - VAPID_SUBJECT=${VAPID_SUBJECT:-mailto:alerts@beacon.local}
     depends_on:
       db:
         condition: service_healthy
@@ -26,6 +29,9 @@ services:
       - DATABASE_URL=postgresql://beacon:beacon@db:5432/beacon
       - REDIS_URL=redis://redis:6379
       - BREVO_API_KEY=${BREVO_API_KEY}
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
+      - VAPID_SUBJECT=${VAPID_SUBJECT:-mailto:alerts@beacon.local}
     depends_on:
       db:
         condition: service_healthy

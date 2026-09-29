@@ -38,6 +38,30 @@ All services run inside Docker Compose on a production VM. NPM routes external t
    docker exec beacon-app node dist/scripts/seed.js
    ```
 
+## Browser Push Notifications (optional)
+
+Beacon can push monitor up/down alerts straight to a browser that has
+installed the PWA, in addition to email/Slack/Discord/webhook channels.
+It's entirely optional and self-hiding: if the VAPID env vars below aren't
+set, the "Browser push" toggle in Settings simply doesn't appear.
+
+1. **Generate a VAPID key pair:**
+   ```bash
+   npx web-push generate-vapid-keys --json
+   ```
+2. **Set three env vars** (`app` *and* `worker` both need all three — the
+   worker delivers the actual push, the app sends test notifications and
+   serves the public key to the browser):
+   - `VAPID_PUBLIC_KEY`
+   - `VAPID_PRIVATE_KEY`
+   - `VAPID_SUBJECT` — a `mailto:` address or `https://` URL you control
+3. Restart the `app` and `worker` containers. Existing users opt in per
+   device from Settings → Notifications → Browser push.
+
+Dead subscriptions (uninstalled PWA, revoked permission, expired push
+endpoint) are pruned automatically the next time a delivery attempt gets a
+404/410 back from the push service.
+
 ## Nginx Proxy Manager Configuration
 
 1. Open NPM dashboard (usually `http://<unraid-ip>:81`)
